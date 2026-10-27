@@ -18,7 +18,7 @@ The project investigates this question:
 
 > On the same workload sequence, how do fixed allocation, reactive threshold scaling, and forecast-guided scaling differ in estimated cost, simulated CPU utilization, number of scaling actions, and threshold-based SLA violations?
 
-The prototype is intended to make the comparison repeatable and inspectable. It does **not** assume that predictive scaling always wins. Any savings or reliability claim must be calculated from the selected data and policy and then evaluated against a realistic workload before being generalised.
+The prototype is intended to make the comparison repeatable and inspectable. The Cost Analysis comparison's predictive policy is a past-only five-step linear-trend baseline, separate from the browser ML model. The browser ML pipeline trains only on observations at or before the current playhead. The project does **not** assume that predictive scaling always wins. Any savings or reliability claim must be calculated from the selected data and policy and then evaluated against a realistic workload before being generalised.
 
 ## 3. Objectives
 
@@ -35,7 +35,7 @@ The prototype is intended to make the comparison repeatable and inspectable. It 
 
 - **Frontend:** React, TypeScript, Vite, Tailwind CSS and Recharts. Views include Home, Dashboard, Dataset Manager, Manual Input, What-if Lab, Simulation, ML Pipeline, Scaling Policy, VM Fleet, Cost Analysis, Architecture Report, and AWS Deployment Guide.
 - **Browser simulation:** A shared context coordinates workload data, playhead, simulated VM state, policies, incidents, and scaling events.
-- **Browser ML engine:** A custom Random-Forest-style tree ensemble and an autoregressive linear baseline. These are the two selectable models currently exposed by the UI. The UI does not offer Gradient Boosting or LSTM because those choices were not implemented as separate models.
+- **Browser ML engine:** A custom Random-Forest-style tree ensemble and an autoregressive linear baseline. These are the two selectable models currently exposed by the UI. Training requires at least 35 observed records and uses only rows at or before the current simulation playhead; rewinding/resetting clears the model. The UI does not offer Gradient Boosting or LSTM because those choices were not implemented as separate models.
 - **Python API:** FastAPI with a scikit-learn Random Forest training script, feature engineering, recursive forecasting, request-driven strategy comparison, and in-memory demo cluster state.
 - **Database assets:** A PostgreSQL service, schema, and seed SQL are included. The current API simulator does not persist its VM state or telemetry to PostgreSQL.
 
