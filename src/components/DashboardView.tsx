@@ -1772,7 +1772,7 @@ export const DashboardView: React.FC = () => {
 
                         {showConfidenceBands && point.upperBound != null && point.lowerBound != null && (
                           <div className="text-[10px] text-purple-400/80 pt-1 flex items-center justify-between font-sans border-t border-slate-800/60">
-                            <span>95% Confidence Band:</span>
+                            <span>Illustrative forecast range:</span>
                             <span className="font-mono">
                               {point.lowerBound} – {point.upperBound}
                               {cfg.unit}
@@ -1905,7 +1905,7 @@ export const DashboardView: React.FC = () => {
                 </>
               )}
 
-              {/* 95% Confidence Interval Upper/Lower Envelopes */}
+              {/* Illustrative forecast range (not calibrated confidence intervals) */}
               {showConfidenceBands && (
                 <Line
                   type="monotone"
@@ -2076,12 +2076,12 @@ export const DashboardView: React.FC = () => {
                 <span>Section E — Architectural Cost Analysis</span>
               </h2>
               <p className="text-xs text-slate-400">
-                Cumulative cloud expenditure comparison across the three autoscaling strategies.
+                Estimated cumulative spend for the fixed 6-VM reference versus the current active fleet. This is not a three-strategy benchmark.
               </p>
             </div>
             <div className="text-right">
               <span className="text-xs text-slate-400 block">Hourly Rate Difference</span>
-              <span className="text-lg font-bold font-mono text-emerald-400">+{savingsPercent}%</span>
+              <span className="text-lg font-bold font-mono text-emerald-400">{savingsPercent >= 0 ? '+' : ''}{savingsPercent}%</span>
             </div>
           </div>
 
