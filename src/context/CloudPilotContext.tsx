@@ -128,7 +128,7 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [dataset, setDataset] = useState<WorkloadMetric[]>([]);
   const [datasetMeta, setDatasetMeta] = useState<DatasetMeta>({
     id: 'sample-001',
-    name: 'Production Multi-Tier Cloud Workload (10,000 Records)',
+    name: 'Generated Sample Workload (10,000 Points)',
     total_records: 10000,
     source: 'sample',
     created_at: new Date().toISOString(),
@@ -291,7 +291,7 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setDataset(data);
     setDatasetMeta({
       id: 'sample-' + Date.now(),
-      name: 'Production Multi-Tier Cloud Workload (10,000 Records)',
+      name: 'Generated Sample Workload (10,000 Points)',
       total_records: data.length,
       source: 'sample',
       created_at: new Date().toISOString(),
