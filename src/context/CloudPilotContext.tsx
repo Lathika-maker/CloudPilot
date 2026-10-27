@@ -915,24 +915,25 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         prev.map((v) => (v.id === victim.id ? { ...v, status: 'FAILED', health: 'UNHEALTHY' } : v))
       );
     } else {
-      const observed = dataset[currentIndex];
-      if (!observed) return 'Load a workload before injecting a telemetry anomaly.';
+      const targetIndex = currentIndex + 1;
+      const observed = dataset[targetIndex];
+      if (!observed) return 'Move the playhead to a point before the end of the workload before injecting an anomaly.';
 
       const alreadyInjected = activeFailures.some(
-        (incident) => !incident.resolved && incident.affectedIndex === currentIndex && incident.originalMetric
+        (incident) => !incident.resolved && incident.affectedIndex === targetIndex && incident.originalMetric
       );
       if (alreadyInjected) {
         return 'A telemetry anomaly is already active at this record. Resolve it before injecting another anomaly here.';
       }
 
-      affectedIndex = currentIndex;
+      affectedIndex = targetIndex;
       originalMetric = { ...observed };
       let changed: WorkloadMetric = { ...observed };
 
       if (type === 'cpu_spike') {
         changed.cpu_usage = Math.min(100, observed.cpu_usage + 45);
         changed.response_time = Math.max(observed.response_time, Math.round(20 + (changed.cpu_usage > 75 ? Math.pow(changed.cpu_usage - 75, 1.5) : 0)));
-        desc = `CPU spike applied to record ${currentIndex + 1}: CPU increased by 45 percentage points (capped at 100%).`;
+        desc = `CPU spike applied to record ${targetIndex + 1}: CPU increased by 45 percentage points (capped at 100%).`;
       } else if (type === 'memory_leak') {
         changed.memory_usage = Math.min(100, observed.memory_usage + 35);
         desc = `Memory pressure applied to record ${currentIndex + 1}: memory increased by 35 percentage points (capped at 100%).`;
@@ -955,12 +956,9 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         desc = `Latency degradation applied to record ${currentIndex + 1}: response time raised to at least 400 ms.`;
       }
 
-      setDataset((prev) => prev.map((metric, index) => index === currentIndex ? changed : metric));
-      // The active row has changed, so metrics and forecasts from the previous row values are stale.
-      globalMLEngine.reset();
-      setMlMetrics(null);
-      setIsModelTrained(false);
-      setFuturePredictions([]);
+      // Mutate the next row, not the already-processed playhead row, so the next simulation
+      // step consumes the injected value. A model trained on current history remains causal.
+      setDataset((prev) => prev.map((metric, index) => index === targetIndex ? changed : metric));
     }
 
     const incident: FailureIncident = {
