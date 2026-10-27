@@ -293,10 +293,20 @@ export function normalizeMappedRows(
   ];
 
   const metrics: WorkloadMetric[] = rows.map((row, index) => {
-    const rawTime = mapping.timestamp ? row[mapping.timestamp] : '';
-    let validTime = rawTime;
-    if (!validTime || isNaN(new Date(validTime).getTime())) {
+    const rawTime = mapping.timestamp ? String(row[mapping.timestamp] ?? '').trim() : '';
+    let validTime: string;
+    if (!mapping.timestamp) {
+      // Explicitly synthetic ordering timestamps for datasets with no time column.
       validTime = new Date(Date.now() + index * 60000).toISOString();
+    } else {
+      let parsedTime: number = NaN;
+      if (/^\d{10}$/.test(rawTime)) parsedTime = Number(rawTime) * 1000; // Unix seconds
+      else if (/^\d{13}$/.test(rawTime)) parsedTime = Number(rawTime); // Unix milliseconds
+      else parsedTime = Date.parse(rawTime);
+      if (!rawTime || !Number.isFinite(parsedTime)) {
+        throw new Error(`Invalid timestamp at data row ${index + 2}. Choose a valid date/time column or leave Timestamp unmapped to use generated ordering timestamps.`);
+      }
+      validTime = new Date(parsedTime).toISOString();
     }
 
     // Preserve legitimate zero values. Using parseFloat(value) || fallback would
