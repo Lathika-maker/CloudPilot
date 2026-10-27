@@ -58,19 +58,19 @@ export const CostAnalysisView: React.FC = () => {
       metric: 'Total Cloud Cost ($)',
       'Fixed Fleet': benchmarkResult.fixed.totalCost,
       'Reactive Autoscaling': benchmarkResult.reactive.totalCost,
-      'CloudPilot Predictive AI': benchmarkResult.predictive.totalCost,
+      'Predictive Trend Baseline': benchmarkResult.predictive.totalCost,
     },
     {
       metric: 'SLA Violations (Count)',
       'Fixed Fleet': benchmarkResult.fixed.slaViolations,
       'Reactive Autoscaling': benchmarkResult.reactive.slaViolations,
-      'CloudPilot Predictive AI': benchmarkResult.predictive.slaViolations,
+      'Predictive Trend Baseline': benchmarkResult.predictive.slaViolations,
     },
     {
       metric: 'Scaling Actions',
       'Fixed Fleet': benchmarkResult.fixed.scaleUpEvents + benchmarkResult.fixed.scaleDownEvents,
       'Reactive Autoscaling': benchmarkResult.reactive.scaleUpEvents + benchmarkResult.reactive.scaleDownEvents,
-      'CloudPilot Predictive AI': benchmarkResult.predictive.scaleUpEvents + benchmarkResult.predictive.scaleDownEvents,
+      'Predictive Trend Baseline': benchmarkResult.predictive.scaleUpEvents + benchmarkResult.predictive.scaleDownEvents,
     },
   ];
 
@@ -177,13 +177,13 @@ export const CostAnalysisView: React.FC = () => {
             <span>Simulation estimate</span>
           </div>
           <h2 className="text-2xl font-black text-white">
-            Predictive scaling is <span className={benchmarkResult.costSavingsPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{Math.abs(benchmarkResult.costSavingsPercent)}% {benchmarkResult.costSavingsPercent >= 0 ? 'lower cost' : 'higher cost'}</span> than fixed
+            The trend-baseline strategy is <span className={benchmarkResult.costSavingsPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{Math.abs(benchmarkResult.costSavingsPercent)}% {benchmarkResult.costSavingsPercent >= 0 ? 'lower cost' : 'higher cost'}</span> than fixed
           </h2>
           <p className="text-xs text-slate-300 leading-relaxed font-sans">
             Estimated predictive cost is <strong className="text-white font-mono">${benchmarkResult.predictive.totalCost.toFixed(2)}</strong> versus
-            <strong className="text-white font-mono"> ${benchmarkResult.fixed.totalCost.toFixed(2)}</strong> for fixed allocation. The simulator estimates
+            <strong className="text-white font-mono"> ${benchmarkResult.fixed.totalCost.toFixed(2)}</strong> for fixed allocation. The simulator estimates using a one-minute-per-row assumption
             <strong className="text-white font-mono"> ${Math.abs(benchmarkResult.costSavingsAmount).toFixed(2)}</strong> {benchmarkResult.costSavingsAmount >= 0 ? 'lower spend' : 'additional spend'}.
-            SLA breach estimates are <strong className="text-rose-400 font-mono">{benchmarkResult.reactive.slaViolations}</strong> for reactive and
+            Simulated SLA breach estimates are <strong className="text-rose-400 font-mono">{benchmarkResult.reactive.slaViolations}</strong> for reactive and
             <strong className="text-emerald-400 font-mono"> {benchmarkResult.predictive.slaViolations}</strong> for predictive scaling.
           </p>
         </div>
@@ -221,7 +221,7 @@ export const CostAnalysisView: React.FC = () => {
                 <th className="px-4 py-3">Evaluation Metric</th>
                 <th className="px-4 py-3">1. Fixed Baseline (6 VMs)</th>
                 <th className="px-4 py-3">2. Reactive (Thresholds)</th>
-                <th className="px-4 py-3 text-cyan-400 font-bold">3. CloudPilot Predictive AI</th>
+                <th className="px-4 py-3 text-cyan-400 font-bold">3. Predictive Trend Baseline</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 bg-slate-900/50">
@@ -241,7 +241,7 @@ export const CostAnalysisView: React.FC = () => {
                 <td className="px-4 py-3 font-sans font-medium text-slate-300">Average CPU Utilization (%)</td>
                 <td className="px-4 py-3 text-rose-400">{benchmarkResult.fixed.avgCpu.toFixed(1)}% (Idle)</td>
                 <td className="px-4 py-3 text-amber-300">{benchmarkResult.reactive.avgCpu.toFixed(1)}%</td>
-                <td className="px-4 py-3 text-emerald-400 font-bold">{benchmarkResult.predictive.avgCpu.toFixed(1)}% (Optimal)</td>
+                <td className="px-4 py-3 text-emerald-400 font-bold">{benchmarkResult.predictive.avgCpu.toFixed(1)}% (simulated estimate)</td>
               </tr>
               <tr>
                 <td className="px-4 py-3 font-sans font-medium text-slate-300">Scaling Actions Triggered</td>
@@ -256,8 +256,8 @@ export const CostAnalysisView: React.FC = () => {
               <tr>
                 <td className="px-4 py-3 font-sans font-medium text-slate-300">SLA Violations (CPU &gt; 90% or Latency &gt; 100ms)</td>
                 <td className="px-4 py-3 text-amber-400">{benchmarkResult.fixed.slaViolations} breaches</td>
-                <td className="px-4 py-3 text-rose-400 font-semibold">{benchmarkResult.reactive.slaViolations} breaches (Boot lag)</td>
-                <td className="px-4 py-3 text-emerald-400 font-bold">{benchmarkResult.predictive.slaViolations} breaches (Proactive)</td>
+                <td className="px-4 py-3 text-rose-400 font-semibold">{benchmarkResult.reactive.slaViolations} breaches (simulated estimate)</td>
+                <td className="px-4 py-3 text-emerald-400 font-bold">{benchmarkResult.predictive.slaViolations} breaches (trend forecast estimate)</td>
               </tr>
               <tr>
                 <td className="px-4 py-3 font-sans font-medium text-slate-300">Resource Wastage Hours</td>
@@ -294,7 +294,7 @@ export const CostAnalysisView: React.FC = () => {
                 <Legend wrapperStyle={{ fontSize: '11px' }} />
                 <Bar dataKey="Fixed Fleet" fill="#64748b" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="Reactive Autoscaling" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="CloudPilot Predictive AI" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Predictive Trend Baseline" fill="#10b981" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
