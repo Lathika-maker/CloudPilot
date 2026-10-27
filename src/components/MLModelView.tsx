@@ -27,6 +27,10 @@ export const MLModelView: React.FC = () => {
     trainMLModel,
     activeModelType,
     setActiveModelType,
+    dataset,
+    currentIndex,
+    jumpToStep,
+    setActiveTab,
   } = useCloudPilot();
 
   const [isTraining, setIsTraining] = useState<boolean>(false);
@@ -96,7 +100,7 @@ export const MLModelView: React.FC = () => {
             onChange={(e) => {
               const val = e.target.value as MLAlgorithm;
               setActiveModelType(val);
-              runTraining(val);
+              setTrainingMessage(null);
             }}
             className="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-1.5 font-mono"
           >
@@ -106,7 +110,7 @@ export const MLModelView: React.FC = () => {
 
           <button
             onClick={handleRetrain}
-            disabled={isTraining}
+            disabled={isTraining || currentIndex + 1 < 35}
             className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-purple-600 text-white hover:bg-purple-500 shadow-md shadow-purple-950/50 disabled:opacity-50"
           >
             <RotateCw className={`w-3.5 h-3.5 ${isTraining ? 'animate-spin' : ''}`} />
@@ -122,6 +126,28 @@ export const MLModelView: React.FC = () => {
           {trainingMessage.message}
         </div>
       )}
+
+      <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-100">Observed workload history: {Math.min(currentIndex + 1, dataset.length).toLocaleString()} / {dataset.length.toLocaleString()} records</p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-400">
+            Training uses only records at or before the simulation playhead. At least 35 observed records are required, so later rows cannot leak into the forecast.
+          </p>
+        </div>
+        {currentIndex + 1 < 35 && dataset.length >= 35 && (
+          <button
+            onClick={() => { jumpToStep(34); setTrainingMessage({ success: true, message: 'Playhead moved to record 35. This selects the first 35 records as observed history; it does not replay the skipped scaling events.' }); }}
+            className="shrink-0 rounded-lg border border-indigo-500/40 bg-indigo-600/15 px-3 py-2 text-xs font-semibold text-indigo-200 hover:bg-indigo-600/25"
+          >
+            Use first 35 records as history
+          </button>
+        )}
+        {dataset.length < 35 && (
+          <button onClick={() => setActiveTab('dataset')} className="shrink-0 rounded-lg border border-cyan-500/40 bg-cyan-600/15 px-3 py-2 text-xs font-semibold text-cyan-200 hover:bg-cyan-600/25">
+            Load a larger dataset
+          </button>
+        )}
+      </div>
 
       {/* Model Evaluation Metrics Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -190,7 +216,12 @@ export const MLModelView: React.FC = () => {
             <Sparkles className="w-4 h-4 text-purple-400" />
           </div>
 
-          <div className="h-64 w-full">
+          <div className="h-64 w-full relative">
+            {featureChartData.length === 0 && (
+              <div className="absolute inset-0 z-10 grid place-items-center rounded-lg border border-dashed border-slate-800 bg-slate-950/40 px-6 text-center text-xs leading-relaxed text-slate-500">
+                Feature scores appear after a successful training run on the observed history.
+              </div>
+            )}
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={featureChartData} layout="vertical" margin={{ top: 5, right: 20, left: 40, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
@@ -296,9 +327,8 @@ export const MLModelView: React.FC = () => {
 
           <div className="p-3 bg-purple-950/30 rounded-lg border border-purple-800/40 text-xs text-purple-200 flex items-center justify-between">
             <span>
-              Lead-Time Activation: Initiates node spin-up when forecasted load at <strong>t+3min</strong> breaches capacity.
+              Forecast-guided scaling is a simulation policy. Real VM provisioning and boot-time latency are not connected or measured here.
             </span>
-            <span className="font-mono text-cyan-300 font-bold">Boot: ~2.5 mins</span>
           </div>
         </div>
       </div>
