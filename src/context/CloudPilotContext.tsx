@@ -311,6 +311,9 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setCurrentIndex(0);
     setScalingEvents([]);
     setIsRunning(false);
+    setMlMetrics(null);
+    setIsModelTrained(false);
+    setFuturePredictions([]);
   }, []);
 
   const loadUploadedData = useCallback(
@@ -329,6 +332,9 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setCurrentIndex(0);
       setScalingEvents([]);
       setIsRunning(false);
+      setMlMetrics(null);
+      setIsModelTrained(false);
+      setFuturePredictions([]);
     },
     []
   );
@@ -348,6 +354,9 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setCurrentIndex(0);
     setScalingEvents([]);
     setIsRunning(false);
+    setMlMetrics(null);
+    setIsModelTrained(false);
+    setFuturePredictions([]);
   }, []);
 
   const simulatedInstancesMap = useRef<Record<number, number>>({});
@@ -855,7 +864,13 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const recent = dataset.slice(Math.max(0, currentIndex - 20), currentIndex + 1);
       if (recent.length >= 15) {
         setFuturePredictions(globalMLEngine.predictFuture(recent, 10));
+      } else {
+        setFuturePredictions([]);
       }
+    } else {
+      setMlMetrics(null);
+      setIsModelTrained(false);
+      setFuturePredictions([]);
     }
     return res;
   };
