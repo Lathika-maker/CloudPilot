@@ -142,26 +142,29 @@ export function runStrategyComparison(
     });
 
     // --- PREDICTIVE ---
-    // Look ahead 5 steps in dataset (simulating ML forecast)
-    const lookAheadSteps = Math.min(5, metrics.length - 1 - idx);
-    let futureMaxRps = rps;
-    for (let k = 1; k <= lookAheadSteps; k++) {
-      if (metrics[idx + k].requests_per_second > futureMaxRps) {
-        futureMaxRps = metrics[idx + k].requests_per_second;
-      }
+    // Use only observations at or before this index. The former implementation
+    // looked ahead into future dataset rows, which leaked the answer into the policy.
+    // This cost-comparison baseline uses a simple five-step linear trend forecast;
+    // it is separate from the trained browser ML pipeline.
+    const historyStart = Math.max(0, idx - 4);
+    const observedHistory = metrics.slice(historyStart, idx + 1).map((point) => point.requests_per_second);
+    let predictedRps = rps;
+    if (observedHistory.length >= 2) {
+      const meanStepChange = (observedHistory[observedHistory.length - 1] - observedHistory[0]) / (observedHistory.length - 1);
+      predictedRps = Math.max(0, Math.round(rps + meanStepChange * 5));
     }
-
     const predictiveNeeded = Math.max(
       policy.minInstances,
-      Math.min(policy.maxInstances, Math.ceil(futureMaxRps / (capacityPerVm * (policy.targetCpuUtilization / 100))))
+      Math.min(policy.maxInstances, Math.ceil(predictedRps / (capacityPerVm * (policy.targetCpuUtilization / 100))))
     );
+    const predictiveCurrentCpu = Math.min(100, Math.round((rps / Math.max(1, predictiveInstances * capacityPerVm)) * 100 * 10) / 10);
 
     if (timeMs - predictiveLastScale >= cooldownMs) {
       if (predictiveNeeded > predictiveInstances) {
         predictiveInstances = predictiveNeeded;
         predictiveScaleUp++;
         predictiveLastScale = timeMs;
-      } else if (predictiveNeeded < predictiveInstances && finalReactiveCpu < policy.cpuLowerThreshold) {
+      } else if (predictiveNeeded < predictiveInstances && predictiveCurrentCpu < policy.cpuLowerThreshold) {
         predictiveInstances = Math.max(policy.minInstances, predictiveInstances - 1);
         predictiveScaleDown++;
         predictiveLastScale = timeMs;
@@ -229,7 +232,7 @@ export function runStrategyComparison(
 
   const predictiveResult: StrategyResult = {
     strategy: 'predictive',
-    name: 'CloudPilot Predictive',
+    name: 'Predictive Trend Baseline',
     avgCpu: Math.round((predictiveCpuSum / n) * 10) / 10,
     peakCpu: Math.round(predictivePeakCpu * 10) / 10,
     avgResponseTime: Math.round((predictiveRtSum / n) * 10) / 10,
