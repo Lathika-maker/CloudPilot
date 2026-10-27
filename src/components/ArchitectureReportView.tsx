@@ -93,7 +93,7 @@ Where:
 $N = \\lceil \\text{Predicted RPS} / (250 \\times 0.70) \\rceil$.
 
 ### Q5: Can this run in Docker without paid cloud accounts?
-**Answer:** Yes. CloudPilot is architected with a dual-execution paradigm: it runs as a local simulation. The AWS guide contains illustrative Terraform/Boto3 snippets, but they are not wired into the app or provided as a tested deployment in an aws/ directory. Do not claim live AWS provisioning.
+**Answer:** CloudPilot runs as a local simulation. The AWS guide contains illustrative Terraform/Boto3 snippets, but they are not wired into the app or provided as a tested deployment in an aws/ directory. Do not claim live AWS provisioning.
 `;
 
   const handleDownloadMarkdown = () => {
@@ -161,7 +161,7 @@ $N = \\lceil \\text{Predicted RPS} / (250 \\times 0.70) \\rceil$.
           <div className="text-slate-500">            │</div>
           <div className="text-slate-500">            ▼</div>
           <div className="text-indigo-400 font-bold">PREDICTIVE MACHINE LEARNING MODEL:</div>
-          <div>Random Forest Regressor / Gradient Boosting (Forecast: t+5m, t+10m, t+15m)</div>
+          <div>Random-Forest-style ensemble / Autoregressive baseline (forecast from observed history)</div>
           <div className="text-slate-500">            │</div>
           <div className="text-slate-500">            ▼</div>
           <div className="text-emerald-400 font-bold">PROACTIVE SCALING ORCHESTRATOR:</div>
@@ -217,10 +217,10 @@ $N = \\lceil \\text{Predicted RPS} / (250 \\times 0.70) \\rceil$.
 
           <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
             <h3 className="text-xs font-bold text-cyan-300">
-              Q4: Can this be deployed to AWS in real production?
+              Q4: Does this repository currently deploy CloudPilot to AWS?
             </h3>
             <p className="text-xs text-slate-300 leading-relaxed font-sans">
-              <strong>Answer:</strong> Yes. The AWS Deployment Guide shows illustrative snippets only. The current app does not provision or change AWS resources, and no tested aws/ Terraform deployment is included. The repository does not contain a tested live deployment. (<code className="text-emerald-300 font-mono">aws/</code>) with Terraform configs to provision an Application Load Balancer, Auto Scaling Group (ASG), and an AWS Lambda / ECS task that queries the CloudPilot ML engine and adjusts the ASG desired capacity via Boto3.
+              <strong>Answer:</strong> No. The AWS Deployment Guide shows illustrative snippets only. The current app does not provision or change AWS resources, and no tested Terraform deployment is included. The repository does not contain a tested live deployment.
             </p>
           </div>
         </div>
