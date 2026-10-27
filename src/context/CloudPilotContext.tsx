@@ -278,8 +278,9 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (trainRes.success && trainRes.metrics) {
         setMlMetrics(trainRes.metrics);
         setIsModelTrained(true);
-        const preds = globalMLEngine.predictFuture(initialData.slice(0, 30), 10);
-        setFuturePredictions(preds);
+        // A forecast must only use history available at the current playhead.
+        // Keep the chart empty until the simulation has collected enough history.
+        setFuturePredictions([]);
       }
     } catch (e) {
       console.warn('Initial ML training deferred:', e);
