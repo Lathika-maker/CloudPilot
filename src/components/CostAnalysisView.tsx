@@ -180,18 +180,19 @@ export const CostAnalysisView: React.FC = () => {
             Predictive scaling is <span className="text-emerald-400">{Math.abs(benchmarkResult.costSavingsPercent)}% {benchmarkResult.costSavingsPercent >= 0 ? 'lower cost' : 'higher cost'}</span> than fixed
           </h2>
           <p className="text-xs text-slate-300 leading-relaxed font-sans">
-            In this simulation, predictive scaling estimates{' '}
-            <strong className="text-white font-mono" >/strong> over fixed provisioning
-            while cutting SLA breaches from <strong className="text-rose-400 font-mono">{benchmarkResult.reactive.slaViolations}</strong> down to{' '}
-            <strong className="text-emerald-400 font-mono">{benchmarkResult.predictive.slaViolations}</strong> compared to reactive autoscaling.
+            Estimated predictive cost is <strong className="text-white font-mono">${benchmarkResult.predictive.totalCost.toFixed(2)}</strong> versus
+            <strong className="text-white font-mono"> ${benchmarkResult.fixed.totalCost.toFixed(2)}</strong> for fixed allocation. The simulator estimates
+            <strong className="text-white font-mono"> ${Math.abs(benchmarkResult.costSavingsAmount).toFixed(2)}</strong> {benchmarkResult.costSavingsAmount >= 0 ? 'lower spend' : 'additional spend'}.
+            SLA breach estimates are <strong className="text-rose-400 font-mono">{benchmarkResult.reactive.slaViolations}</strong> for reactive and
+            <strong className="text-emerald-400 font-mono"> {benchmarkResult.predictive.slaViolations}</strong> for predictive scaling.
           </p>
         </div>
 
         <div className="flex items-center gap-4 bg-slate-950/80 p-4 rounded-xl border border-slate-800 shrink-0">
           <div className="text-center px-3">
-            <span className="text-[10px] text-slate-500 uppercase block font-mono">Estimated Savings</span>
-            <span className="text-2xl font-extrabold font-mono text-emerald-400">
-              +{benchmarkResult.costSavingsPercent}%
+            <span className="text-[10px] text-slate-500 uppercase block font-mono">{benchmarkResult.costSavingsAmount >= 0 ? 'Estimated savings' : 'Estimated cost increase'}</span>
+            <span className={`text-2xl font-extrabold font-mono ${benchmarkResult.costSavingsAmount >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {benchmarkResult.costSavingsAmount >= 0 ? '+' : '−'}{Math.abs(benchmarkResult.costSavingsPercent)}%
             </span>
             <span className="text-[10px] text-slate-400 block mt-0.5">${Math.abs(benchmarkResult.costSavingsAmount).toFixed(2)} {benchmarkResult.costSavingsAmount >= 0 ? 'estimated savings' : 'estimated additional cost'}</span>
           </div>
