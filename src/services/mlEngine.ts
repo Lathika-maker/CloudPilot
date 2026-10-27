@@ -413,7 +413,7 @@ export class MLEngine {
 
     let testPredictions: number[] = [];
 
-    if (this.currentConfig.modelType === 'random_forest' || this.currentConfig.modelType === 'lstm_sim') {
+    if (this.currentConfig.modelType === 'random_forest') {
       const rf = new RandomForestRegressor(16, 7);
       rf.fit(X_train, y_train);
       this.rfModel = rf;
