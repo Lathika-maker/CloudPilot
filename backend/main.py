@@ -290,22 +290,50 @@ def list_instances():
 
 @app.post("/api/instances/{instance_id}/action")
 def instance_lifecycle_action(instance_id: str, action: str):
-    """Controls instance lifecycle: start, stop, restart, terminate."""
-    if instance_id not in cluster_instances and action != "create":
-        raise HTTPException(status_code=404, detail=f"Instance {instance_id} not found.")
+    """Apply an explicit lifecycle change to the in-memory simulator only."""
+    supported_actions = {"create", "start", "stop", "restart", "terminate"}
+    if action not in supported_actions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported action '{action}'. Choose one of: {', '.join(sorted(supported_actions))}."
+        )
 
+    if action == "create":
+        if instance_id in cluster_instances:
+            raise HTTPException(status_code=409, detail=f"Simulated instance {instance_id} already exists.")
+        instance = InstanceModel(
+            id=instance_id,
+            status="RUNNING",
+            cpu_usage=0.0,
+            memory_usage=0.0,
+            requests_served=0,
+            uptime_seconds=0,
+            accumulated_cost=0.0,
+            healthy=True,
+        )
+        cluster_instances[instance_id] = instance
+        return {"status": "created", "simulated_only": True, "instance": instance}
+
+    if instance_id not in cluster_instances:
+        raise HTTPException(status_code=404, detail=f"Simulated instance {instance_id} not found.")
+
+    instance = cluster_instances[instance_id]
     if action == "stop":
-        cluster_instances[instance_id].status = "STOPPING"
+        instance.status = "TERMINATED"
+        instance.healthy = False
     elif action == "start":
-        cluster_instances[instance_id].status = "STARTING"
+        instance.status = "RUNNING"
+        instance.healthy = True
     elif action == "restart":
-        cluster_instances[instance_id].status = "STARTING"
-        cluster_instances[instance_id].requests_served = 0
+        instance.status = "RUNNING"
+        instance.healthy = True
+        instance.requests_served = 0
+        instance.uptime_seconds = 0
     elif action == "terminate":
         del cluster_instances[instance_id]
-        return {"status": "terminated", "id": instance_id}
+        return {"status": "terminated", "id": instance_id, "simulated_only": True}
 
-    return cluster_instances.get(instance_id)
+    return {"status": "updated", "simulated_only": True, "instance": instance}
 
 @app.post("/api/simulate/failure")
 def inject_anomaly(anomaly_type: str):
