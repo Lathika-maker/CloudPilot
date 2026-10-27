@@ -18,13 +18,11 @@ export const HomeView: React.FC = () => {
     loadSampleDataset,
     dataset,
     datasetMeta,
-    startSimulation,
   } = useCloudPilot();
 
   const handleUseSample = () => {
     loadSampleDataset();
     setActiveTab('dashboard');
-    startSimulation();
   };
 
   return (
@@ -107,12 +105,12 @@ export const HomeView: React.FC = () => {
                 Use Sample Dataset
               </h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Load <strong>10,000 generated workload points</strong> with a daily traffic pattern,
+                Load <strong>600 generated workload points</strong> with a daily traffic pattern,
                 configurable peaks and correlated CPU/RAM/RPS telemetry. This is synthetic demo data, not a production trace.
               </p>
             </div>
             <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-indigo-400 group-hover:text-indigo-300">
-              <span>Launch 10K Simulation</span>
+              <span>Load Demo Workload</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </div>
           </div>
