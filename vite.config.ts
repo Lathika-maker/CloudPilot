@@ -5,6 +5,9 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    // This project is deployed as a project site from the ux-cleanup branch.
+    // Keep asset URLs under /CloudPilot/ for GitHub Pages.
+    base: process.env.GITHUB_PAGES === 'true' ? '/CloudPilot/' : '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
