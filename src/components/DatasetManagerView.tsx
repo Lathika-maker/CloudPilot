@@ -49,7 +49,7 @@ export const DatasetManagerView: React.FC = () => {
 
   const targetFields = [
     { key: 'timestamp', label: 'Timestamp / Date', required: true },
-    { key: 'requests_per_second', label: 'Requests / Sec (RPS)', required: true },
+    { key: 'requests_per_second', label: 'Primary Load Signal (RPS if available)', required: true },
     { key: 'cpu_usage', label: 'CPU Utilization %', required: true },
     { key: 'memory_usage', label: 'Memory / RAM %', required: false },
     { key: 'active_users', label: 'Active Concurrent Users', required: false },
@@ -165,7 +165,7 @@ export const DatasetManagerView: React.FC = () => {
             <h1 className="text-xl font-bold text-white">Dataset Management & Ingestion Hub</h1>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            Load synthetic demo data or upload your own workload. CloudPilot does not connect to live production telemetry.
+            Load synthetic demo data or upload your own workload. CloudPilot ingests uploaded historical telemetry; it does not connect to live production telemetry.
           </p>
         </div>
 
@@ -275,7 +275,7 @@ export const DatasetManagerView: React.FC = () => {
                   <span>Upload Custom CSV or JSON File</span>
                 </h2>
                 <p className="text-xs text-slate-400">
-                  Select a workload metrics file from your local machine to calibrate the scaling model.
+                  Upload telemetry from different platforms; map a primary load signal and verify units before interpreting scaling or cost estimates.
                 </p>
               </div>
             </div>
@@ -331,7 +331,7 @@ export const DatasetManagerView: React.FC = () => {
 
                 {missingFieldsNotice.length > 0 && (
                   <div className="p-3 rounded-lg bg-amber-950/40 border border-amber-700/60 text-amber-300 text-xs">
-                    <strong>Notice:</strong> The following optional fields were not found in your file: [{missingFieldsNotice.join(', ')}]. CloudPilot will automatically compute realistic synthetic approximations for any unmapped telemetry.
+                    <strong>Notice:</strong> The following optional fields were not found in your file: [{missingFieldsNotice.join(', ')}]. Unmapped fields use simulator-only estimates for compatibility; they are not observations from your source dataset.
                   </div>
                 )}
 
