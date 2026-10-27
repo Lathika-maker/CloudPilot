@@ -127,9 +127,9 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   // Workload Dataset
   const [dataset, setDataset] = useState<WorkloadMetric[]>([]);
   const [datasetMeta, setDatasetMeta] = useState<DatasetMeta>({
-    id: 'sample-001',
-    name: 'Generated Sample Workload (10,000 Points)',
-    total_records: 10000,
+    id: 'none',
+    name: 'No dataset loaded',
+    total_records: 0,
     source: 'sample',
     created_at: new Date().toISOString(),
     columns: [
@@ -143,7 +143,7 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       'active_instances',
     ],
     mapped_columns: {},
-    is_active: true,
+    is_active: false,
   });
 
   // Simulation State
@@ -261,38 +261,14 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     [dataset, currentIndex, alertConfig]
   );
 
-  // Initialize Sample Dataset and Instances on mount
-  useEffect(() => {
-    const initialData = generateRealisticSampleData(10000);
-    setDataset(initialData);
-    setVirtualInstances(createInitialVirtualInstances(4, scalingPolicy.costPerInstanceHour));
-
-    // Pre-train ML model with initial data slice for instant responsiveness
-    try {
-      const trainRes = globalMLEngine.train(initialData.slice(0, 1000), {
-        modelType: 'random_forest',
-        targetMetric: 'requests_per_second',
-        horizonMinutes: 10,
-        trainRatio: 0.8,
-      });
-      if (trainRes.success && trainRes.metrics) {
-        setMlMetrics(trainRes.metrics);
-        setIsModelTrained(true);
-        // A forecast must only use history available at the current playhead.
-        // Keep the chart empty until the simulation has collected enough history.
-        setFuturePredictions([]);
-      }
-    } catch (e) {
-      console.warn('Initial ML training deferred:', e);
-    }
-  }, []);
+  // Start empty. Workload and model state are initialized only after an explicit user action.
 
   const loadSampleDataset = useCallback(() => {
-    const data = generateRealisticSampleData(10000);
+    const data = generateRealisticSampleData(600);
     setDataset(data);
     setDatasetMeta({
       id: 'sample-' + Date.now(),
-      name: 'Generated Sample Workload (10,000 Points)',
+      name: 'Generated Sample Workload (600 Points)',
       total_records: data.length,
       source: 'sample',
       created_at: new Date().toISOString(),
@@ -310,13 +286,16 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       is_active: true,
     });
     setCurrentIndex(0);
+    setVirtualInstances(createInitialVirtualInstances(4, scalingPolicy.costPerInstanceHour));
     setScalingEvents([]);
+    simulatedInstancesMap.current = {};
+    lastScaleTimeMs.current = -999999;
     setIsRunning(false);
     globalMLEngine.reset();
     setMlMetrics(null);
     setIsModelTrained(false);
     setFuturePredictions([]);
-  }, []);
+  }, [scalingPolicy.costPerInstanceHour]);
 
   const loadUploadedData = useCallback(
     (metrics: WorkloadMetric[], name: string, mapping: Record<string, string>) => {
@@ -332,14 +311,17 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         is_active: true,
       });
       setCurrentIndex(0);
+      setVirtualInstances(createInitialVirtualInstances(4, scalingPolicy.costPerInstanceHour));
       setScalingEvents([]);
+      simulatedInstancesMap.current = {};
+      lastScaleTimeMs.current = -999999;
       setIsRunning(false);
       globalMLEngine.reset();
-    setMlMetrics(null);
+      setMlMetrics(null);
       setIsModelTrained(false);
       setFuturePredictions([]);
     },
-    []
+    [scalingPolicy.costPerInstanceHour]
   );
 
   const loadManualData = useCallback((metrics: WorkloadMetric[]) => {
@@ -355,13 +337,16 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       is_active: true,
     });
     setCurrentIndex(0);
+    setVirtualInstances(createInitialVirtualInstances(4, scalingPolicy.costPerInstanceHour));
     setScalingEvents([]);
+    simulatedInstancesMap.current = {};
+    lastScaleTimeMs.current = -999999;
     setIsRunning(false);
     globalMLEngine.reset();
     setMlMetrics(null);
     setIsModelTrained(false);
     setFuturePredictions([]);
-  }, []);
+  }, [scalingPolicy.costPerInstanceHour]);
 
   const simulatedInstancesMap = useRef<Record<number, number>>({});
 
@@ -833,7 +818,10 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
   }, [isRunning, simulationSpeed, executeSimulationStep]);
 
-  const startSimulation = () => setIsRunning(true);
+  const startSimulation = () => {
+    if (dataset.length === 0) return;
+    setIsRunning(true);
+  };
   const pauseSimulation = () => setIsRunning(false);
   const stepSimulation = () => executeSimulationStep();
   const resetSimulation = () => {
