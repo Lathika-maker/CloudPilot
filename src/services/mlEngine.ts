@@ -289,6 +289,14 @@ export class AutoregressiveModel {
 export class MLEngine {
   private rfModel: RandomForestRegressor | null = null;
   private arModel: AutoregressiveModel | null = null;
+
+  /** Clear trained state whenever the workload dataset changes. */
+  reset(): void {
+    this.rfModel = null;
+    this.arModel = null;
+    this.metrics = null;
+    this.isTrained = false;
+  }
   private currentConfig: MLModelConfig = {
     modelType: 'random_forest',
     targetMetric: 'requests_per_second',
