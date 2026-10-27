@@ -79,7 +79,7 @@ export const MLModelView: React.FC = () => {
             <h1 className="text-xl font-bold text-white">Machine Learning Pipeline & Time-Series Engine</h1>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            Feature engineering, chronological train/test split, model evaluation metrics, and multi-step future forecasting.
+            Browser-side forecasting with chronological holdout evaluation on the selected workload.
           </p>
         </div>
 
@@ -96,8 +96,6 @@ export const MLModelView: React.FC = () => {
           >
             <option value="Random Forest Regressor">Random Forest Regressor (Ensemble)</option>
             <option value="Autoregressive / Moving Average">Autoregressive / Moving Average (Baseline)</option>
-            <option value="Gradient Boosting / XGBoost">Gradient Boosting / XGBoost Proxy</option>
-            <option value="LSTM Neural Network">LSTM Neural Network (Recurrent)</option>
           </select>
 
           <button
@@ -118,7 +116,7 @@ export const MLModelView: React.FC = () => {
           <span className="text-[11px] font-medium text-slate-400 block">Mean Absolute Error (MAE)</span>
           <div className="mt-1 flex items-baseline justify-between">
             <span className="text-2xl font-bold font-mono text-cyan-400">
-              {(modelMetrics?.mae ?? 18.42).toFixed(2)}
+              {modelMetrics?.mae != null ? modelMetrics.mae.toFixed(2) : '—'}
             </span>
             <span className="text-xs font-mono text-slate-500">req/s</span>
           </div>
@@ -130,7 +128,7 @@ export const MLModelView: React.FC = () => {
           <span className="text-[11px] font-medium text-slate-400 block">Root Mean Squared Error (RMSE)</span>
           <div className="mt-1 flex items-baseline justify-between">
             <span className="text-2xl font-bold font-mono text-purple-400">
-              {(modelMetrics?.rmse ?? 24.15).toFixed(2)}
+              {modelMetrics?.rmse != null ? modelMetrics.rmse.toFixed(2) : '—'}
             </span>
             <span className="text-xs font-mono text-slate-500">req/s</span>
           </div>
@@ -139,12 +137,12 @@ export const MLModelView: React.FC = () => {
 
         {/* MAPE */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm">
-          <span className="text-[11px] font-medium text-slate-400 block">MAPE Accuracy Ratio</span>
+          <span className="text-[11px] font-medium text-slate-400 block">Mean Absolute Percentage Error (MAPE)</span>
           <div className="mt-1 flex items-baseline justify-between">
             <span className="text-2xl font-bold font-mono text-emerald-400">
-              {(modelMetrics?.mape ?? 4.8).toFixed(1)}%
+              {modelMetrics?.mape != null ? `${modelMetrics.mape.toFixed(1)}%` : '—'}
             </span>
-            <span className="text-xs font-mono text-emerald-400 font-bold">Excellent</span>
+            <span className="text-xs font-mono text-slate-500">{modelMetrics?.mape != null ? "Measured" : "Not evaluated"}</span>
           </div>
           <span className="text-[10px] text-slate-500 mt-1 block">Mean Absolute Percentage Error</span>
         </div>
@@ -154,7 +152,7 @@ export const MLModelView: React.FC = () => {
           <span className="text-[11px] font-medium text-slate-400 block">Coefficient of Determination (R²)</span>
           <div className="mt-1 flex items-baseline justify-between">
             <span className="text-2xl font-bold font-mono text-indigo-400">
-              {(modelMetrics?.r2 ?? 0.942).toFixed(3)}
+              {modelMetrics?.r2 != null ? modelMetrics.r2.toFixed(3) : '—'}
             </span>
             <span className="text-xs font-mono text-slate-500">Max 1.0</span>
           </div>
@@ -169,10 +167,10 @@ export const MLModelView: React.FC = () => {
           <div className="flex items-center justify-between pb-2 border-b border-slate-800">
             <div>
               <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                Engineered Features & Feature Importance (%)
+                Feature Scores (normalized)
               </h2>
               <p className="text-[11px] text-slate-500">
-                Calculated across lag intervals (t-1, t-5), rolling averages, and sin/cos cyclical hour encodings.
+                Tree split gains or normalized absolute baseline coefficients; scores are derived from the fitted model.
               </p>
             </div>
             <Sparkles className="w-4 h-4 text-purple-400" />
@@ -199,9 +197,9 @@ export const MLModelView: React.FC = () => {
           </div>
 
           <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 text-xs text-slate-400 space-y-1 font-mono text-[11px]">
-            <p><strong>Training Samples:</strong> {(modelMetrics?.sample_size ?? modelMetrics?.sampleCount ?? 8000).toLocaleString()} records</p>
+            <p><strong>Training Samples:</strong> {modelMetrics?.sample_size != null ? Number(modelMetrics.sample_size).toLocaleString() : '—'} records</p>
             <p><strong>Split Strategy:</strong> Chronological 80/20 (No future leakage)</p>
-            <p><strong>Last Trained:</strong> {new Date(modelMetrics?.trained_at || modelMetrics?.trainedAt || Date.now()).toLocaleTimeString()}</p>
+            <p><strong>Last Trained:</strong> {modelMetrics?.trained_at || modelMetrics?.trainedAt ? new Date(modelMetrics.trained_at || modelMetrics.trainedAt).toLocaleTimeString() : 'Not trained'}</p>
           </div>
         </div>
 
@@ -210,16 +208,16 @@ export const MLModelView: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-800">
             <div>
               <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                Multi-Step Ahead Workload Forecast (Horizon Horizon)
+                Workload Forecast (RPS)
               </h2>
               <p className="text-[11px] text-slate-500">
-                Predictive trajectory with upper/lower bounds used for 2-3 minute cloud boot lead time.
+                Recursive forecast for the selected horizon. Shaded bands estimate model spread; they are not calibrated 95% confidence intervals.
               </p>
             </div>
 
             {/* Horizon Selector */}
             <div className="flex items-center space-x-1 text-xs">
-              {[5, 10, 15, 30].map((h) => (
+              {[5, 10].map((h) => (
                 <button
                   key={h}
                   onClick={() => setSelectedHorizon(h)}
@@ -252,7 +250,7 @@ export const MLModelView: React.FC = () => {
                 <Area
                   type="monotone"
                   dataKey="upper"
-                  name="95% Upper Bound"
+                  name="Upper forecast band"
                   stroke="transparent"
                   fill="#c084fc"
                   fillOpacity={0.15}
@@ -260,7 +258,7 @@ export const MLModelView: React.FC = () => {
                 <Area
                   type="monotone"
                   dataKey="lower"
-                  name="95% Lower Bound"
+                  name="Lower forecast band"
                   stroke="transparent"
                   fill="#c084fc"
                   fillOpacity={0.1}
