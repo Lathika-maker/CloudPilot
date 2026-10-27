@@ -849,11 +849,14 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       cfg = configOrAlgo;
     }
 
-    const res = globalMLEngine.train(dataset, cfg);
+    // Train only on observations at or before the simulation playhead. This prevents
+    // later rows in the uploaded file from leaking into a live forecast.
+    const observedHistory = dataset.slice(0, currentIndex + 1);
+    const res = globalMLEngine.train(observedHistory, cfg);
     if (res.success && res.metrics) {
       setMlMetrics(res.metrics);
       setIsModelTrained(true);
-      const recent = dataset.slice(Math.max(0, currentIndex - 20), currentIndex + 1);
+      const recent = observedHistory.slice(Math.max(0, observedHistory.length - 25));
       if (recent.length >= 15) {
         setFuturePredictions(globalMLEngine.predictFuture(recent, 10));
       } else {
@@ -861,7 +864,7 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
     } else {
       globalMLEngine.reset();
-    setMlMetrics(null);
+      setMlMetrics(null);
       setIsModelTrained(false);
       setFuturePredictions([]);
     }
