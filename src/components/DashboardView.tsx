@@ -269,28 +269,20 @@ export const DashboardView: React.FC = () => {
         : `T-${24 - idx}`;
       const instances = getInstanceCountForStep(stepIdx, m);
 
-      // Model predicted value simulation with 97% accuracy on historical window
-      let predRps = m.requests_per_second;
-      if (idx > 0) {
-        const prev = histSlice[idx - 1];
-        predRps = Math.round(m.requests_per_second * 0.98 + prev.requests_per_second * 0.02);
-      }
-      const predInstances = Math.max(1, Math.ceil(predRps / (scalingPolicy.instanceCapacityRps * 0.70)));
-      const predCpu = Math.min(99, Math.max(12, Math.round((predRps / (instances * scalingPolicy.instanceCapacityRps)) * 70)));
-      const predMemory = Math.min(95, Math.max(20, Math.round(38 + (predRps / 1200) * 35)));
-
+      // Historical observations are actual data. Do not fabricate a prediction line.
+      // Predicted values are populated only by the trained model's forecast below.
       points.push({
         time: timeStr,
         rawTimestamp: m.timestamp,
         isFuture: false,
         actualCpu: Number(m.cpu_usage.toFixed(1)),
-        predCpu,
+        predCpu: null,
         actualRps: m.requests_per_second,
-        predRps,
+        predRps: null,
         actualMemory: Number(m.memory_usage.toFixed(1)),
-        predMemory,
+        predMemory: null,
         actualInstances: instances,
-        predInstances,
+        predInstances: null,
         upperBound: null,
         lowerBound: null,
       });
@@ -389,16 +381,11 @@ export const DashboardView: React.FC = () => {
   // Real-time MAE for the selected metric
   const trendMae = useMemo(() => {
     const historicalPoints = rawResourceTrends.filter((p) => !p.isFuture);
-    if (historicalPoints.length === 0) return '1.8';
-    let totalError = 0;
-    const cfg = TREND_METRIC_CONFIGS[selectedTrendMetric];
-    historicalPoints.forEach((p) => {
-      const act = p[cfg.actualDataKey];
-      const pred = p[cfg.predDataKey];
-      if (act != null && pred != null) totalError += Math.abs(pred - act);
-    });
-    return (totalError / historicalPoints.length).toFixed(1);
-  }, [rawResourceTrends, selectedTrendMetric]);
+    // This dashboard does not compare a forecast against future ground truth.
+    // Use the model's held-out RPS MAE only for the RPS view; other metrics are not evaluated.
+    if (selectedTrendMetric !== 'rps' || mlMetrics?.mae == null) return '—';
+    return mlMetrics.mae.toFixed(2);
+  }, [rawResourceTrends, selectedTrendMetric, mlMetrics]);
 
   // Resource scaling history (Section D)
   const scalingHistoryData = useMemo(() => {
@@ -435,19 +422,17 @@ export const DashboardView: React.FC = () => {
   const elapsedMinutes = currentIndex + 1;
   const elapsedHours = elapsedMinutes / 60;
   const fixedCumulative = fixedHourlySpend * elapsedHours;
-  const reactiveCumulative = currentHourlySpend * 1.15 * elapsedHours * 0.85; // representative reactive lag
   const predictiveCumulative = currentHourlySpend * elapsedHours;
 
   const costComparisonBars = [
     { name: 'Fixed Fleet (6 VMs)', cost: Number(fixedCumulative.toFixed(2)), fill: '#64748b' },
-    { name: 'Reactive Autoscaling', cost: Number(reactiveCumulative.toFixed(2)), fill: '#f59e0b' },
-    { name: 'CloudPilot Predictive AI', cost: Number(predictiveCumulative.toFixed(2)), fill: '#3b82f6' },
+    { name: `Current ${activeStrategy} fleet (estimate)`, cost: Number(predictiveCumulative.toFixed(2)), fill: '#3b82f6' },
   ];
 
   // Highest predicted load
   const maxPredictedRps = futurePredictions.length > 0
     ? Math.max(...futurePredictions.map((p) => p.predicted))
-    : currentMetric ? currentMetric.requests_per_second : 0;
+    : null;
 
   return (
     <div className="space-y-6 pb-12">
@@ -1408,11 +1393,11 @@ export const DashboardView: React.FC = () => {
             <span className="text-[11px] text-slate-400 block font-medium">Predicted Load</span>
             <div className="mt-1 flex items-baseline justify-between">
               <span className="text-xl font-bold font-mono text-purple-400">
-                {(Math.round(maxPredictedRps) || 0).toLocaleString()} <span className="text-xs text-slate-500 font-normal">rps</span>
+                {maxPredictedRps != null ? Math.round(maxPredictedRps).toLocaleString() : '—'} <span className="text-xs text-slate-500 font-normal">{maxPredictedRps != null ? 'rps' : ''}</span>
               </span>
               <Sparkles className="w-4 h-4 text-purple-400" />
             </div>
-            <span className="text-[10px] text-purple-300/70 mt-1 block">+10 min horizon</span>
+            <span className="text-[10px] text-purple-300/70 mt-1 block">{futurePredictions.length > 0 ? '+10 min model forecast' : 'Train model and advance simulation'}</span>
           </div>
 
           {/* Card 7: Estimated Cost */}
@@ -1436,7 +1421,7 @@ export const DashboardView: React.FC = () => {
               </span>
               <ArrowDownRight className="w-4 h-4 text-emerald-400" />
             </div>
-            <span className="text-[10px] text-slate-400 mt-1 block">vs Fixed baseline</span>
+            <span className="text-[10px] text-slate-400 mt-1 block">Instantaneous estimate, not measured savings</span>
           </div>
         </div>
       </section>
@@ -1979,10 +1964,9 @@ export const DashboardView: React.FC = () => {
               <Activity className="w-3.5 h-3.5" />
             </div>
             <div>
-              <span className="text-slate-400 text-[10px] block">Mean Absolute Error</span>
+              <span className="text-slate-400 text-[10px] block">Holdout MAE (RPS only)</span>
               <span className="font-mono font-bold text-slate-200">
-                ±{trendMae}
-                {TREND_METRIC_CONFIGS[selectedTrendMetric].unit}
+                {trendMae !== '—' ? `${trendMae} req/s` : 'Not evaluated'}
               </span>
             </div>
           </div>
@@ -1994,7 +1978,7 @@ export const DashboardView: React.FC = () => {
             <div>
               <span className="text-slate-400 text-[10px] block">Model Alignment (R²)</span>
               <span className="font-mono font-bold text-purple-300">
-                {mlMetrics?.r2 ? (mlMetrics.r2 * 100).toFixed(1) : '98.4'}% Correlation
+                {mlMetrics?.r2 != null ? mlMetrics.r2.toFixed(3) : 'Not evaluated'}
               </span>
             </div>
           </div>
