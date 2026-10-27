@@ -2,17 +2,10 @@ import React, { useState } from 'react';
 import { useCloudPilot } from '../context/CloudPilotContext';
 import { MLAlgorithm } from '../types/cloudpilot';
 import {
-  Activity,
-  AlertCircle,
   Brain,
-  CheckCircle2,
-  Cpu,
   Layers,
-  Play,
   RotateCw,
   Sparkles,
-  TrendingUp,
-  Zap,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -34,19 +27,32 @@ export const MLModelView: React.FC = () => {
     trainMLModel,
     activeModelType,
     setActiveModelType,
-    currentMetric,
   } = useCloudPilot();
 
   const [isTraining, setIsTraining] = useState<boolean>(false);
   const [selectedHorizon, setSelectedHorizon] = useState<number>(10);
+  const [trainingMessage, setTrainingMessage] = useState<{ success: boolean; message: string } | null>(null);
 
-  const handleRetrain = () => {
+  const runTraining = (model: MLAlgorithm) => {
     setIsTraining(true);
+    setTrainingMessage(null);
+    // Yield to the browser so the busy state is visible before synchronous model fitting.
     setTimeout(() => {
-      trainMLModel(activeModelType);
-      setIsTraining(false);
-    }, 600);
+      try {
+        const result = trainMLModel(model);
+        setTrainingMessage(result);
+      } catch (error) {
+        setTrainingMessage({
+          success: false,
+          message: error instanceof Error ? error.message : 'Training failed. Check the selected workload data.',
+        });
+      } finally {
+        setIsTraining(false);
+      }
+    }, 50);
   };
+
+  const handleRetrain = () => runTraining(activeModelType);
 
   // Convert feature importance to chart data
   const featureImportanceObj = modelMetrics?.feature_importance || {};
@@ -90,7 +96,7 @@ export const MLModelView: React.FC = () => {
             onChange={(e) => {
               const val = e.target.value as MLAlgorithm;
               setActiveModelType(val);
-              trainMLModel(val);
+              runTraining(val);
             }}
             className="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-1.5 font-mono"
           >
@@ -107,6 +113,14 @@ export const MLModelView: React.FC = () => {
             <span>{isTraining ? 'Training...' : 'Retrain Model'}</span>
           </button>
         </div>
+        {trainingMessage && (
+          <div
+            role="status"
+            className={`mt-3 rounded-lg border px-3 py-2 text-xs leading-relaxed ${trainingMessage.success ? 'border-emerald-800/60 bg-emerald-950/20 text-emerald-200' : 'border-rose-800/60 bg-rose-950/20 text-rose-200'}`}
+          >
+            {trainingMessage.message}
+          </div>
+        )}
       </div>
 
       {/* Model Evaluation Metrics Cards */}
@@ -197,7 +211,7 @@ export const MLModelView: React.FC = () => {
           </div>
 
           <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 text-xs text-slate-400 space-y-1 font-mono text-[11px]">
-            <p><strong>Training Samples:</strong> {modelMetrics?.sample_size != null ? Number(modelMetrics.sample_size).toLocaleString() : '—'} records</p>
+            <p><strong>Dataset Points:</strong> {modelMetrics?.sample_size != null ? Number(modelMetrics.sample_size).toLocaleString() : '—'} records</p>
             <p><strong>Split Strategy:</strong> Chronological 80/20 (No future leakage)</p>
             <p><strong>Last Trained:</strong> {modelMetrics?.trained_at || modelMetrics?.trainedAt ? new Date(modelMetrics.trained_at || modelMetrics.trainedAt).toLocaleTimeString() : 'Not trained'}</p>
           </div>
@@ -233,7 +247,12 @@ export const MLModelView: React.FC = () => {
             </div>
           </div>
 
-          <div className="h-64 w-full">
+          <div className="h-64 w-full relative">
+            {predictionPoints.length === 0 && (
+              <div className="absolute inset-0 z-10 grid place-items-center rounded-lg border border-dashed border-slate-800 bg-slate-950/40 px-6 text-center text-xs leading-relaxed text-slate-500">
+                Forecast points appear after the simulation has collected at least 15 historical workload records. Start or step the simulation to build history.
+              </div>
+            )}
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={predictionPoints.slice(0, selectedHorizon)} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
