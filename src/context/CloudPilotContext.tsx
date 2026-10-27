@@ -843,10 +843,6 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         cfg = { modelType: 'random_forest' };
       } else if (configOrAlgo === 'Autoregressive / Moving Average') {
         cfg = { modelType: 'autoregressive' };
-      } else if (configOrAlgo === 'Gradient Boosting / XGBoost') {
-        cfg = { modelType: 'random_forest' };
-      } else if (configOrAlgo === 'LSTM Neural Network') {
-        cfg = { modelType: 'lstm_sim' };
       }
     } else if (configOrAlgo) {
       cfg = configOrAlgo;
@@ -936,40 +932,15 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const modelMetrics = mlMetrics
     ? {
         ...mlMetrics,
-        mape: mlMetrics.mape ?? 4.8,
-        sample_size: mlMetrics.sampleCount ?? 8000,
-        trained_at: mlMetrics.trainedAt ?? new Date().toISOString(),
+        sample_size: mlMetrics.sampleCount ?? mlMetrics.sample_size,
+        trained_at: mlMetrics.trainedAt ?? mlMetrics.trained_at,
         feature_importance: mlMetrics.feature_importance ?? (
           mlMetrics.featureImportance
-            ? Object.fromEntries(mlMetrics.featureImportance.map((f) => [f.name, f.weight]))
-            : {
-                lag_1_workload: 0.32,
-                rolling_mean_5m: 0.24,
-                rolling_mean_15m: 0.16,
-                cyclical_hour_sin: 0.12,
-                lag_2_workload: 0.08,
-                trend_delta: 0.05,
-                rolling_std_5m: 0.03,
-              }
+            ? Object.fromEntries(mlMetrics.featureImportance.map((feature) => [feature.name, feature.weight]))
+            : {}
         ),
       }
-    : {
-        mae: 18.42,
-        rmse: 24.15,
-        r2: 0.942,
-        mape: 4.8,
-        sample_size: 8000,
-        trained_at: new Date().toISOString(),
-        feature_importance: {
-          lag_1_workload: 0.32,
-          rolling_mean_5m: 0.24,
-          rolling_mean_15m: 0.16,
-          cyclical_hour_sin: 0.12,
-          lag_2_workload: 0.08,
-          trend_delta: 0.05,
-          rolling_std_5m: 0.03,
-        },
-      };
+    : null;
 
   return (
     <CloudPilotContext.Provider
