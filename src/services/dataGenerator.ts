@@ -223,6 +223,7 @@ export function autoMapColumns(headers: string[]): Record<string, string> {
     active_instances: [/instance/, /instances/, /vms/, /nodes/, /replicas/, /servers/],
   };
 
+  // Prefer explicit semantic matches first; never overwrite a stronger match.
   for (const [targetKey, regexes] of Object.entries(patterns)) {
     for (let i = 0; i < headers.length; i++) {
       const hLower = lowerHeaders[i];
@@ -231,6 +232,15 @@ export function autoMapColumns(headers: string[]): Record<string, string> {
         break;
       }
     }
+  }
+
+  // Many public telemetry datasets use generic names such as "value", "metric_value",
+  // or "usage". If no request/throughput signal exists, expose one generic numeric
+  // signal as the workload proxy so the user can inspect/override the mapping.
+  if (!mapping.requests_per_second) {
+    const excluded = /time|date|timestamp|cpu|processor|memory|mem|ram|latency|response|duration|delay|instance|replica|server|node|user|session|client|network|bandwidth|disk|storage|error|status|label|class|anomaly|id/;
+    const genericIndex = lowerHeaders.findIndex((header) => !excluded.test(header));
+    if (genericIndex >= 0) mapping.requests_per_second = headers[genericIndex];
   }
 
   return mapping;
@@ -243,13 +253,14 @@ export function normalizeMappedRows(
   rows: Record<string, string>[],
   mapping: Record<string, string>
 ): { metrics: WorkloadMetric[]; missingFields: string[] } {
-  const requiredTargets = [
-    'timestamp',
-    'cpu_usage',
-    'memory_usage',
-    'requests_per_second',
+  // Report every unobserved metric. Values are still populated with explicitly
+  // documented simulation defaults because downstream simulator modules currently
+  // consume a fixed schema; these defaults must not be described as source telemetry.
+  const telemetryTargets = [
+    'cpu_usage', 'memory_usage', 'network_usage', 'requests_per_second',
+    'active_users', 'response_time', 'active_instances',
   ];
-  const missingFields = requiredTargets.filter((f) => !mapping[f]);
+  const missingFields = telemetryTargets.filter((field) => !mapping[field]);
 
   const metrics: WorkloadMetric[] = rows.map((row, index) => {
     const rawTime = mapping.timestamp ? row[mapping.timestamp] : '';
