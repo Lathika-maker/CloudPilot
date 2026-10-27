@@ -214,7 +214,7 @@ export const DashboardView: React.FC = () => {
       predictedColor: '#c084fc',
       actualDataKey: 'actualRps',
       predDataKey: 'predRps',
-      description: 'Incoming request throughput compared against ML forecast with 95% confidence intervals.',
+      description: 'Incoming request throughput compared with the model forecast when one is available.',
       thresholdUp: (virtualInstances.filter(v => v.status === 'RUNNING').length || 4) * scalingPolicy.instanceCapacityRps,
       thresholdUpLabel: `Fleet Capacity (${(virtualInstances.filter(v => v.status === 'RUNNING').length || 4) * scalingPolicy.instanceCapacityRps} rps)`,
     },
@@ -380,12 +380,11 @@ export const DashboardView: React.FC = () => {
 
   // Real-time MAE for the selected metric
   const trendMae = useMemo(() => {
-    const historicalPoints = rawResourceTrends.filter((p) => !p.isFuture);
     // This dashboard does not compare a forecast against future ground truth.
     // Use the model's held-out RPS MAE only for the RPS view; other metrics are not evaluated.
     if (selectedTrendMetric !== 'rps' || mlMetrics?.mae == null) return '—';
     return mlMetrics.mae.toFixed(2);
-  }, [rawResourceTrends, selectedTrendMetric, mlMetrics]);
+  }, [selectedTrendMetric, mlMetrics]);
 
   // Resource scaling history (Section D)
   const scalingHistoryData = useMemo(() => {
@@ -415,8 +414,9 @@ export const DashboardView: React.FC = () => {
   const currentHourlySpend = runningVms * costPerHour;
   const fixedInstancesBaseline = 6; // Standard overprovisioned baseline
   const fixedHourlySpend = fixedInstancesBaseline * costPerHour;
-  const hourlySavings = Math.max(0, fixedHourlySpend - currentHourlySpend);
-  const savingsPercent = Math.round((hourlySavings / fixedHourlySpend) * 100);
+  const savingsPercent = fixedHourlySpend > 0
+    ? Math.round(((fixedHourlySpend - currentHourlySpend) / fixedHourlySpend) * 100)
+    : 0;
 
   // Cumulative cost approximation across elapsed steps
   const elapsedMinutes = currentIndex + 1;
@@ -425,7 +425,7 @@ export const DashboardView: React.FC = () => {
   const predictiveCumulative = currentHourlySpend * elapsedHours;
 
   const costComparisonBars = [
-    { name: 'Fixed Fleet (6 VMs)', cost: Number(fixedCumulative.toFixed(2)), fill: '#64748b' },
+    { name: 'Fixed 6-VM reference (estimate)', cost: Number(fixedCumulative.toFixed(2)), fill: '#64748b' },
     { name: `Current ${activeStrategy} fleet (estimate)`, cost: Number(predictiveCumulative.toFixed(2)), fill: '#3b82f6' },
   ];
 
@@ -947,7 +947,7 @@ export const DashboardView: React.FC = () => {
               {/* Latency info */}
               <div className="pt-1 text-[10px] text-slate-500 font-mono flex justify-between items-center">
                 <span>Observed: <strong className="text-white">{currentMetric ? Math.round(currentMetric.response_time) : 0}ms</strong></span>
-                <span className="text-slate-400">P99 SLA Guarantee</span>
+                <span className="text-slate-400">P99 Latency Threshold</span>
               </div>
             </div>
           </div>
@@ -1417,7 +1417,7 @@ export const DashboardView: React.FC = () => {
             <span className="text-[11px] text-emerald-400 block font-medium">Est. Savings</span>
             <div className="mt-1 flex items-baseline justify-between">
               <span className="text-xl font-bold font-mono text-emerald-400">
-                +{savingsPercent}%
+                {savingsPercent >= 0 ? '+' : ''}{savingsPercent}%
               </span>
               <ArrowDownRight className="w-4 h-4 text-emerald-400" />
             </div>
@@ -1641,7 +1641,7 @@ export const DashboardView: React.FC = () => {
               }`}
             >
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>95% Confidence Band</span>
+              <span>Illustrative Forecast Band</span>
             </button>
 
             <button
@@ -1910,7 +1910,7 @@ export const DashboardView: React.FC = () => {
                 <Line
                   type="monotone"
                   dataKey="upperBound"
-                  name="95% Upper Confidence"
+                  name="Upper Forecast Estimate"
                   stroke="#a855f7"
                   strokeWidth={1}
                   strokeDasharray="3 3"
@@ -1922,7 +1922,7 @@ export const DashboardView: React.FC = () => {
                 <Line
                   type="monotone"
                   dataKey="lowerBound"
-                  name="95% Lower Confidence"
+                  name="Lower Forecast Estimate"
                   stroke="#a855f7"
                   strokeWidth={1}
                   strokeDasharray="3 3"
@@ -2080,7 +2080,7 @@ export const DashboardView: React.FC = () => {
               </p>
             </div>
             <div className="text-right">
-              <span className="text-xs text-slate-400 block">Current Savings</span>
+              <span className="text-xs text-slate-400 block">Hourly Rate Difference</span>
               <span className="text-lg font-bold font-mono text-emerald-400">+{savingsPercent}%</span>
             </div>
           </div>
@@ -2105,18 +2105,18 @@ export const DashboardView: React.FC = () => {
             </ResponsiveContainer>
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2 text-center text-xs">
             <div className="bg-slate-800/60 p-2 rounded border border-slate-700">
               <span className="text-slate-400 text-[10px] block">Fixed Fleet Cost</span>
               <span className="font-mono font-bold text-slate-300">${fixedCumulative.toFixed(2)}</span>
             </div>
             <div className="bg-slate-800/60 p-2 rounded border border-slate-700">
-              <span className="text-slate-400 text-[10px] block">Reactive Cost</span>
-              <span className="font-mono font-bold text-amber-300">${reactiveCumulative.toFixed(2)}</span>
+              <span className="text-slate-400 text-[10px] block">Current Fleet Cost</span>
+              <span className="font-mono font-bold text-amber-300">${predictiveCumulative.toFixed(2)}</span>
             </div>
             <div className="bg-indigo-950/40 p-2 rounded border border-indigo-800/60">
-              <span className="text-indigo-300 text-[10px] block">Predictive AI Cost</span>
-              <span className="font-mono font-bold text-cyan-400">${predictiveCumulative.toFixed(2)}</span>
+              <span className="text-indigo-300 text-[10px] block">Configured Rate</span>
+              <span className="font-mono font-bold text-cyan-400">${currentHourlySpend.toFixed(2)}/hr</span>
             </div>
           </div>
         </div>
