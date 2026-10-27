@@ -9,17 +9,17 @@ CloudPilot AI is a cloud-computing project that explores whether workload foreca
 ## What is included
 
 ### Workload input and simulation
-- Built-in **synthetic** workload generation, including daily traffic patterns and occasional spikes.
-- Browser-based CSV/JSON dataset import and column mapping.
+- Built-in **synthetic** workload generation, including daily traffic patterns and occasional spikes. The app starts with no active dataset; loading data is an explicit user action.
+- Browser-based CSV/JSON dataset import and column mapping. The included upload-test file is `public/datasets/cloudpilot_demo_workload.csv` (1,440 rows at one-minute intervals).
 - Manual workload input and editable workload points.
 - A dashboard for simulated workload, VM lifecycle, scaling decisions, resource alarms, and failure-injection scenarios.
 
 ### Forecasting and autoscaling
 - The browser ML pipeline offers two implemented choices: a custom Random-Forest-style tree ensemble and an autoregressive linear baseline.
-- The browser model uses a chronological holdout split and calculates MAE, RMSE, MAPE, and R² from its held-out observations. These metrics remain blank until the model has been trained on the currently selected dataset.
+- The browser model trains only on observations at or before the simulation playhead and uses a chronological holdout split to calculate MAE, RMSE, MAPE, and R². At least 35 observed rows are required; move the playhead forward, then train. Rewinding/resetting clears trained state to avoid future-data leakage.
 - Feature scores are derived from fitted tree split gains or the baseline's normalized coefficient magnitudes.
 - The Python API has a separate scikit-learn Random Forest pipeline with cyclical, lag, and rolling features. Its checked-in training data is synthetic.
-- Fixed, reactive, and predictive scaling are simulated against workload points. They are not direct AWS, Azure, or Google Cloud autoscaling integrations.
+- Fixed, reactive, and predictive scaling are simulated against workload points. The Cost Analysis comparison's predictive policy is a past-only linear-trend baseline, separate from the trained browser ML model. These are not direct AWS, Azure, or Google Cloud autoscaling integrations.
 
 ### Cost analysis and export
 - Side-by-side strategy comparison runs on the active workload and configured policy.
@@ -117,6 +117,7 @@ ml/feature_engineering.py       Python time-series feature engineering
 ml/train.py                     Python Random Forest training and holdout metrics
 ml/predict.py                   Recursive prediction from observed RPS history
 datasets/sample_workload.csv    288-point synthetic 24-hour workload (5-minute intervals)
+public/datasets/cloudpilot_demo_workload.csv  1,440-point browser upload test (1-minute intervals)
 db/schema.sql                   PostgreSQL schema
 db/seed.sql                     Initial database seed data
 src/components/                 React views and shared UI
