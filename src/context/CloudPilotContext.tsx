@@ -95,7 +95,7 @@ interface CloudPilotContextType {
 
   // Failure Injection
   activeFailures: FailureIncident[];
-  injectFailure: (type: FailureType) => void;
+  injectFailure: (type: FailureType) => string;
   resolveFailure: (id: string) => void;
 
   // Manual Points
@@ -883,31 +883,70 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return res;
   };
 
-  const injectFailure = (type: FailureType) => {
+  const injectFailure = (type: FailureType): string => {
     let desc = '';
     let affectedInstanceId: string | undefined;
+    let affectedIndex: number | undefined;
+    let originalMetric: WorkloadMetric | undefined;
 
     if (type === 'server_failure') {
       const running = virtualInstances.filter((v) => v.status === 'RUNNING');
-      if (running.length > 1) {
-        const victim = running[running.length - 1];
-        affectedInstanceId = victim.id;
-        desc = `Hardware outage simulated on ${victim.name}. Instance status marked FAILED.`;
-        // Mark failed
-        setVirtualInstances((prev) =>
-          prev.map((v) => (v.id === victim.id ? { ...v, status: 'FAILED', health: 'UNHEALTHY' } : v))
-        );
-      } else {
-        desc = 'Cannot fail last remaining server. System must maintain at least 1 instance.';
+      if (running.length <= 1) {
+        return 'Cannot fail the last remaining server. The simulator keeps at least one running instance.';
       }
-    } else if (type === 'cpu_spike') {
-      desc = 'Sudden +45% CPU computational spike injected.';
-    } else if (type === 'memory_leak') {
-      desc = 'Rapid +35% memory consumption leak injected.';
-    } else if (type === 'traffic_surge') {
-      desc = 'Sudden +140% incoming traffic surge injected.';
-    } else if (type === 'traffic_drop') {
-      desc = 'Sudden -75% incoming traffic collapse injected.';
+      const victim = running[running.length - 1];
+      affectedInstanceId = victim.id;
+      desc = `Simulated hardware failure on ${victim.name}; the VM is marked FAILED until this incident is resolved.`;
+      setVirtualInstances((prev) =>
+        prev.map((v) => (v.id === victim.id ? { ...v, status: 'FAILED', health: 'UNHEALTHY' } : v))
+      );
+    } else {
+      const observed = dataset[currentIndex];
+      if (!observed) return 'Load a workload before injecting a telemetry anomaly.';
+
+      const alreadyInjected = activeFailures.some(
+        (incident) => !incident.resolved && incident.affectedIndex === currentIndex && incident.originalMetric
+      );
+      if (alreadyInjected) {
+        return 'A telemetry anomaly is already active at this record. Resolve it before injecting another anomaly here.';
+      }
+
+      affectedIndex = currentIndex;
+      originalMetric = { ...observed };
+      let changed: WorkloadMetric = { ...observed };
+
+      if (type === 'cpu_spike') {
+        changed.cpu_usage = Math.min(100, observed.cpu_usage + 45);
+        changed.response_time = Math.max(observed.response_time, Math.round(20 + (changed.cpu_usage > 75 ? Math.pow(changed.cpu_usage - 75, 1.5) : 0)));
+        desc = `CPU spike applied to record ${currentIndex + 1}: CPU increased by 45 percentage points (capped at 100%).`;
+      } else if (type === 'memory_leak') {
+        changed.memory_usage = Math.min(100, observed.memory_usage + 35);
+        desc = `Memory pressure applied to record ${currentIndex + 1}: memory increased by 35 percentage points (capped at 100%).`;
+      } else if (type === 'traffic_surge') {
+        changed.requests_per_second = Math.round(observed.requests_per_second * 4);
+        changed.active_users = Math.round(observed.active_users * 4);
+        changed.network_usage = Math.round(observed.network_usage * 4 * 100) / 100;
+        changed.cpu_usage = Math.min(100, Math.round(observed.cpu_usage * 1.8));
+        changed.response_time = Math.max(observed.response_time, Math.round(observed.response_time * 1.8));
+        desc = `Traffic surge applied to record ${currentIndex + 1}: RPS, active users and network usage increased by 300%.`;
+      } else if (type === 'traffic_drop') {
+        changed.requests_per_second = Math.round(observed.requests_per_second * 0.2);
+        changed.active_users = Math.round(observed.active_users * 0.2);
+        changed.network_usage = Math.round(observed.network_usage * 0.2 * 100) / 100;
+        changed.cpu_usage = Math.round(observed.cpu_usage * 0.2 * 10) / 10;
+        desc = `Traffic drop applied to record ${currentIndex + 1}: RPS, active users and network usage reduced by 80%.`;
+      } else if (type === 'latency_degradation') {
+        changed.response_time = Math.max(400, observed.response_time + 380);
+        changed.network_usage = Math.round(observed.network_usage * 1.5 * 100) / 100;
+        desc = `Latency degradation applied to record ${currentIndex + 1}: response time raised to at least 400 ms.`;
+      }
+
+      setDataset((prev) => prev.map((metric, index) => index === currentIndex ? changed : metric));
+      // The active row has changed, so metrics and forecasts from the previous row values are stale.
+      globalMLEngine.reset();
+      setMlMetrics(null);
+      setIsModelTrained(false);
+      setFuturePredictions([]);
     }
 
     const incident: FailureIncident = {
@@ -917,24 +956,36 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       timestamp: new Date().toISOString(),
       resolved: false,
       affectedInstanceId,
+      affectedIndex,
+      originalMetric,
     };
-
     setActiveFailures((prev) => [incident, ...prev]);
+    return desc;
   };
 
   const resolveFailure = (id: string) => {
-    setActiveFailures((prev) => {
-      const found = prev.find((f) => f.id === id);
-      if (found && found.type === 'server_failure' && found.affectedInstanceId) {
-        // Restore instance
-        setVirtualInstances((vms) =>
-          vms.map((v) =>
-            v.id === found.affectedInstanceId ? { ...v, status: 'RUNNING', health: 'HEALTHY' } : v
-          )
-        );
-      }
-      return prev.filter((f) => f.id !== id);
-    });
+    const found = activeFailures.find((incident) => incident.id === id);
+    if (!found) return;
+
+    if (found.type === 'server_failure' && found.affectedInstanceId) {
+      setVirtualInstances((vms) =>
+        vms.map((vm) =>
+          vm.id === found.affectedInstanceId ? { ...vm, status: 'RUNNING', health: 'HEALTHY' } : vm
+        )
+      );
+    }
+
+    if (found.originalMetric && found.affectedIndex != null) {
+      setDataset((prev) =>
+        prev.map((metric, index) => index === found.affectedIndex ? found.originalMetric! : metric)
+      );
+      globalMLEngine.reset();
+      setMlMetrics(null);
+      setIsModelTrained(false);
+      setFuturePredictions([]);
+    }
+
+    setActiveFailures((prev) => prev.filter((incident) => incident.id !== id));
   };
 
   const runExperiment = () => {
