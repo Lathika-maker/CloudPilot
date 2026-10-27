@@ -14,7 +14,6 @@ import { CostAnalysisView } from './components/CostAnalysisView';
 import { ArchitectureReportView } from './components/ArchitectureReportView';
 import { AwsDeploymentGuideView } from './components/AwsDeploymentGuideView';
 import { StrategyInfoModal } from './components/StrategyInfoModal';
-import { StrategyNotificationBanner } from './components/StrategyNotificationBanner';
 
 const MainContent: React.FC = () => {
   const { activeTab } = useCloudPilot();
@@ -44,7 +43,6 @@ export default function App() {
     <CloudPilotProvider>
       <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500 selection:text-white">
         <Navbar onOpenStrategyInfo={() => setIsStrategyModalOpen(true)} />
-        <StrategyNotificationBanner onOpenInfoModal={() => setIsStrategyModalOpen(true)} />
         <StrategyInfoModal
           isOpen={isStrategyModalOpen}
           onClose={() => setIsStrategyModalOpen(false)}
