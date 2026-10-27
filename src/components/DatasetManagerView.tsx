@@ -28,7 +28,6 @@ export const DatasetManagerView: React.FC = () => {
     loadSampleDataset,
     loadUploadedData,
     setActiveTab,
-    trainMLModel,
     startSimulation,
   } = useCloudPilot();
 
@@ -223,14 +222,11 @@ export const DatasetManagerView: React.FC = () => {
                 <span>Reload 600-point Sample</span>
               </button>
               <button
-                onClick={() => {
-                  trainMLModel();
-                  setActiveTab('ml');
-                }}
+                onClick={() => setActiveTab('ml')}
                 className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 text-white hover:bg-purple-500 shadow"
               >
                 <Layers className="w-3.5 h-3.5" />
-                <span>Train ML Model</span>
+                <span>Open ML Pipeline</span>
               </button>
               <button
                 onClick={() => {
