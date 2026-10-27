@@ -24,7 +24,7 @@ interface StrategyInfoModalProps {
 
 export const StrategyInfoModal: React.FC<StrategyInfoModalProps> = ({ isOpen, onClose }) => {
   const { activeStrategy, setActiveStrategy, virtualInstances, currentMetric, scalingPolicy, dataset } = useCloudPilot();
-  const comparison = useMemo(() => dataset.length > 0 ? runStrategyComparison(dataset, scalingPolicy) : null, [dataset, scalingPolicy]);
+  const comparison = useMemo(() => isOpen && dataset.length > 0 ? runStrategyComparison(dataset, scalingPolicy) : null, [isOpen, dataset, scalingPolicy]);
 
   if (!isOpen) return null;
 
@@ -170,15 +170,15 @@ export const StrategyInfoModal: React.FC<StrategyInfoModalProps> = ({ isOpen, on
           <div className="flex items-center space-x-4 font-mono text-slate-300">
             <div className="flex items-center space-x-1.5">
               <Server className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{runningVms} Active VMs</span>
+              <span>{dataset.length > 0 ? `${runningVms} Active VMs` : 'No active VMs'}</span>
             </div>
             <div className="flex items-center space-x-1.5">
               <Activity className="w-3.5 h-3.5 text-blue-400" />
-              <span>{currentMetric ? `${currentMetric.cpu_usage.toFixed(1)}% Cluster CPU` : 'No workload loaded'}</span>
+              <span>{currentMetric ? `${currentMetric.cpu_usage.toFixed(1)}% Cluster CPU` : 'CPU —'}</span>
             </div>
             <div className="flex items-center space-x-1.5">
               <DollarSign className="w-3.5 h-3.5 text-amber-400" />
-              <span>${currentCost}/hr</span>
+              <span>{dataset.length > 0 ? `${currentCost}/hr` : 'Cost —'}</span>
             </div>
           </div>
         </div>
