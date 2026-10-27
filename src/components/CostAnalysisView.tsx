@@ -142,7 +142,7 @@ export const CostAnalysisView: React.FC = () => {
           <button
             onClick={handleExportCSV}
             className="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-500 shadow"
-            title="Download Academic Research Benchmark as CSV"
+            title="Download simulation comparison as CSV"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export Benchmark CSV</span>
@@ -181,8 +181,7 @@ export const CostAnalysisView: React.FC = () => {
           </h2>
           <p className="text-xs text-slate-300 leading-relaxed font-sans">
             Estimated trend-baseline cost is <strong className="text-white font-mono">${benchmarkResult.predictive.totalCost.toFixed(2)}</strong> versus
-            <strong className="text-white font-mono"> ${benchmarkResult.fixed.totalCost.toFixed(2)}</strong> for fixed allocation. The simulator estimates using a one-minute-per-row assumption
-            <strong className="text-white font-mono"> ${Math.abs(benchmarkResult.costSavingsAmount).toFixed(2)}</strong> {benchmarkResult.costSavingsAmount >= 0 ? 'lower spend' : 'additional spend'}.
+            <strong className="text-white font-mono"> ${benchmarkResult.fixed.totalCost.toFixed(2)}</strong> for fixed allocation. The simulator uses a one-minute-per-row assumption. Estimated difference: <strong className="text-white font-mono"> ${Math.abs(benchmarkResult.costSavingsAmount).toFixed(2)}</strong> {benchmarkResult.costSavingsAmount >= 0 ? 'lower spend' : 'additional spend'}.
             Simulated SLA breach estimates are <strong className="text-rose-400 font-mono">{benchmarkResult.reactive.slaViolations}</strong> for reactive and
             <strong className="text-emerald-400 font-mono"> {benchmarkResult.predictive.slaViolations}</strong> for the trend-baseline policy.
           </p>
@@ -198,7 +197,7 @@ export const CostAnalysisView: React.FC = () => {
           </div>
           <div className="h-10 w-px bg-slate-800"></div>
           <div className="text-center px-3">
-            <span className="text-[10px] text-slate-500 uppercase block font-mono">Predicted SLA</span>
+            <span className="text-[10px] text-slate-500 uppercase block font-mono">Estimated SLA Compliance</span>
             <span className="text-2xl font-extrabold font-mono text-cyan-400">
               {Math.max(0, 100 - benchmarkResult.predictive.slaViolationRate).toFixed(1)}%
             </span>
@@ -207,7 +206,7 @@ export const CostAnalysisView: React.FC = () => {
         </div>
       </div>
 
-      {/* Comprehensive Empirical Comparison Table */}
+      {/* Simulation Comparison Table */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm space-y-4">
         <h2 className="text-sm font-bold text-white flex items-center space-x-2">
           <BarChart3 className="w-4 h-4 text-cyan-400" />
@@ -239,7 +238,7 @@ export const CostAnalysisView: React.FC = () => {
               </tr>
               <tr>
                 <td className="px-4 py-3 font-sans font-medium text-slate-300">Average CPU Utilization (%)</td>
-                <td className="px-4 py-3 text-rose-400">{benchmarkResult.fixed.avgCpu.toFixed(1)}% (Idle)</td>
+                <td className="px-4 py-3 text-rose-400">{benchmarkResult.fixed.avgCpu.toFixed(1)}% (estimate)</td>
                 <td className="px-4 py-3 text-amber-300">{benchmarkResult.reactive.avgCpu.toFixed(1)}%</td>
                 <td className="px-4 py-3 text-emerald-400 font-bold">{benchmarkResult.predictive.avgCpu.toFixed(1)}% (simulated estimate)</td>
               </tr>
