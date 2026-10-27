@@ -69,8 +69,8 @@ export const StrategyInfoModal: React.FC<StrategyInfoModalProps> = ({ isOpen, on
         'The simulated fleet remains fixed at 6 nodes. It does not respond to changes in incoming traffic.',
       pros: ['Predictable capacity and straightforward budgeting', 'No scaling-policy decisions are required'],
       cons: [
-        'Overpays heavily during quiet night hours (idle resource waste)',
-        'Server overload and severe SLA latency crashes during unexpected traffic surges',
+        'Can leave capacity idle during low-demand periods',
+        'Can breach configured CPU/latency thresholds during demand surges',
       ],
       impact: {
         ...getImpact('fixed'),
@@ -79,7 +79,7 @@ export const StrategyInfoModal: React.FC<StrategyInfoModalProps> = ({ isOpen, on
     {
       id: 'reactive' as const,
       name: 'Reactive Autoscaling',
-      subtitle: 'Classic Threshold Scaling (AWS CloudWatch / Kubernetes HPA)',
+      subtitle: 'Threshold-based autoscaling, conceptually similar to common cloud autoscalers',
       badge: 'Industry Standard',
       badgeColor: 'bg-amber-950/80 text-amber-300 border-amber-700/60',
       icon: Zap,
