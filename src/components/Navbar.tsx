@@ -118,8 +118,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenStrategyInfo }) => {
         <span className={activeFailures.length > 0 ? 'cp-context-alert' : 'cp-context-neutral'}>
           <span className="cp-status-dot" />
           {activeFailures.length > 0
-            ? `${activeFailures.length} active injected incident${activeFailures.length > 1 ? 's' : ''}`
-            : `Active strategy: ${activeStrategy === 'fixed' ? 'Fixed allocation' : activeStrategy === 'reactive' ? 'Reactive autoscaling' : 'Predictive autoscaling'}`}
+            ? `Simulation mode • ${activeFailures.length} injected incident${activeFailures.length > 1 ? 's' : ''}`
+            : 'Simulation mode • no cloud resources are modified'}
         </span>
         <div className="cp-strategy-switch" aria-label="Autoscaling strategy">
           {(['fixed', 'reactive', 'predictive'] as const).map((strategy) => (
