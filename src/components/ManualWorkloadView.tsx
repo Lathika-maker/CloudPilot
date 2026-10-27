@@ -544,13 +544,15 @@ export const ManualWorkloadView: React.FC = () => {
             />
           </div>
           <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-700/70">
-            <label className="text-[11px] text-slate-400 block font-medium">Interval (minutes)</label>
+            <label className="text-[11px] text-slate-400 block font-medium">Interval (fixed by simulator)</label>
             <input
               type="number"
-              value={synthParams.intervalMinutes}
-              onChange={(e) => setSynthParams({ ...synthParams, intervalMinutes: Number(e.target.value) || 1 })}
-              className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-sm text-white font-mono"
+              value={1}
+              disabled
+              aria-label="Simulator interval fixed at one minute"
+              className="w-full mt-1 bg-slate-900/60 border border-slate-700 rounded px-2.5 py-1 text-sm text-slate-400 font-mono"
             />
+            <p className="mt-1 text-[10px] text-slate-500">One-minute rows are required for consistent playback and cost estimates.</p>
           </div>
         </div>
 
