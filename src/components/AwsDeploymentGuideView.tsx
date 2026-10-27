@@ -25,7 +25,7 @@ export const AwsDeploymentGuideView: React.FC = () => {
     setTimeout(() => setCopied(null), 2000);
   };
 
-  const terraformSnippet = `# aws/terraform/main.tf
+  const terraformSnippet = `# Example only — place in a separately reviewed Terraform project
 # CloudPilot AI - AWS Free-Tier Compatible Deployment
 terraform {
   required_providers {
@@ -87,7 +87,7 @@ resource "aws_autoscaling_group" "asg" {
   }
 }`;
 
-  const boto3Snippet = `# aws/orchestrator_daemon.py
+  const boto3Snippet = `# Example only — not wired into CloudPilot
 """
 CloudPilot AI - Boto3 AWS AutoScaling Controller
 This script queries CloudPilot's ML prediction endpoint and dynamically
@@ -142,17 +142,21 @@ if __name__ == "__main__":
         <div>
           <div className="flex items-center space-x-2">
             <Cloud className="w-5 h-5 text-indigo-400" />
-            <h1 className="text-xl font-bold text-white">AWS Production Deployment Guide</h1>
+            <h1 className="text-xl font-bold text-white">AWS Deployment Blueprint (Illustrative)</h1>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            Step-by-step instructions, Terraform scripts, and Boto3 daemon for optional real cloud deployment.
+            Illustrative Terraform/Boto3 examples for architecture discussion; this app does not connect to or provision AWS resources.
           </p>
         </div>
 
         <div className="flex items-center space-x-2 text-xs font-mono bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 px-3 py-1.5 rounded-lg shadow">
           <DollarSign className="w-4 h-4 text-emerald-400" />
-          <span>Estimated AWS Cost: ~$0.00 to $1.50 (Free-Tier Eligible)</span>
+          <span>No live AWS resources are created</span>
         </div>
+      </div>
+
+      <div role="note" className="rounded-xl border border-amber-700/50 bg-amber-950/20 p-4 text-xs leading-relaxed text-amber-100">
+        <strong>Prototype limitation:</strong> The code snippets below are illustrative examples shown in this UI, not a checked-in or tested AWS deployment. CloudPilot does not call AWS APIs or create cloud resources. Review IAM permissions, networking, secrets, state, and expected charges before adapting any example; do not run it in production as-is.
       </div>
 
       {/* Navigation Sub-tabs */}
