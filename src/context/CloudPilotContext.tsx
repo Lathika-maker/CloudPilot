@@ -469,8 +469,15 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const jumpToStep = useCallback((step: number) => {
     if (dataset.length === 0) return;
     const clamped = Math.max(0, Math.min(dataset.length - 1, step));
+    // A trained model must not survive a backward seek, because it may have seen later rows.
+    if (clamped < currentIndex) {
+      globalMLEngine.reset();
+      setMlMetrics(null);
+      setIsModelTrained(false);
+      setFuturePredictions([]);
+    }
     setCurrentIndex(clamped);
-  }, [dataset.length]);
+  }, [dataset.length, currentIndex]);
 
   const getInstanceCountForStep = useCallback(
     (stepIndex: number, fallbackMetric?: WorkloadMetric): number => {
@@ -830,6 +837,11 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setScalingEvents([]);
     setVirtualInstances(createInitialVirtualInstances(4, scalingPolicy.costPerInstanceHour));
     lastScaleTimeMs.current = -999999;
+    // Resetting to the beginning invalidates any model trained on later observations.
+    globalMLEngine.reset();
+    setMlMetrics(null);
+    setIsModelTrained(false);
+    setFuturePredictions([]);
   };
 
   const updateScalingPolicy = (newPolicy: Partial<ScalingPolicy>) => {
