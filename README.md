@@ -64,11 +64,15 @@ uvicorn backend.main:app --reload --port 8000
 API documentation is available at [http://localhost:8000/docs](http://localhost:8000/docs).
 
 ### Docker Compose
+First create a local environment file and set a unique password:
+
 ```bash
+cp .env.example .env
+# Edit .env and set POSTGRES_PASSWORD to a unique URL-safe local password.
 docker compose up --build
 ```
 
-The default compose configuration starts the frontend at port 3000, the API at port 8000, and PostgreSQL at port 5432. PostgreSQL is initialized with the checked-in schema and seed SQL, but API state persistence is not wired up yet. Treat the included database credentials as development-only and never use them in a deployed environment.
+The compose configuration starts the frontend at port 3000, the API at port 8000, and PostgreSQL at port 5432. PostgreSQL is initialized with the checked-in schema and seed SQL, but API state persistence is not wired up yet. The ignored `.env` file contains local credentials; do not commit it or reuse it in a deployed environment.
 
 ### Tests
 ```bash
