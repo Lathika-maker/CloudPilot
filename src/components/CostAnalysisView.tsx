@@ -86,7 +86,7 @@ export const CostAnalysisView: React.FC = () => {
       fill: '#f59e0b',
     },
     {
-      name: 'Predictive AI (CloudPilot)',
+      name: 'Predictive Trend Baseline',
       utilization: benchmarkResult.predictive.avgCpu,
       fill: '#10b981',
     },
@@ -180,11 +180,11 @@ export const CostAnalysisView: React.FC = () => {
             The trend-baseline strategy is <span className={benchmarkResult.costSavingsPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{Math.abs(benchmarkResult.costSavingsPercent)}% {benchmarkResult.costSavingsPercent >= 0 ? 'lower cost' : 'higher cost'}</span> than fixed
           </h2>
           <p className="text-xs text-slate-300 leading-relaxed font-sans">
-            Estimated predictive cost is <strong className="text-white font-mono">${benchmarkResult.predictive.totalCost.toFixed(2)}</strong> versus
+            Estimated trend-baseline cost is <strong className="text-white font-mono">${benchmarkResult.predictive.totalCost.toFixed(2)}</strong> versus
             <strong className="text-white font-mono"> ${benchmarkResult.fixed.totalCost.toFixed(2)}</strong> for fixed allocation. The simulator estimates using a one-minute-per-row assumption
             <strong className="text-white font-mono"> ${Math.abs(benchmarkResult.costSavingsAmount).toFixed(2)}</strong> {benchmarkResult.costSavingsAmount >= 0 ? 'lower spend' : 'additional spend'}.
             Simulated SLA breach estimates are <strong className="text-rose-400 font-mono">{benchmarkResult.reactive.slaViolations}</strong> for reactive and
-            <strong className="text-emerald-400 font-mono"> {benchmarkResult.predictive.slaViolations}</strong> for predictive scaling.
+            <strong className="text-emerald-400 font-mono"> {benchmarkResult.predictive.slaViolations}</strong> for the trend-baseline policy.
           </p>
         </div>
 
