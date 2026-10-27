@@ -48,7 +48,7 @@ export const StrategyInfoModal: React.FC<StrategyInfoModalProps> = ({ isOpen, on
     return {
       instances: strategy === 'fixed' ? '6 static VMs' : `${minCount}–${maxCount} VMs (${averageInstances.toFixed(1)} avg.)`,
       slaCompliance: `${Math.max(0, 100 - result.slaViolationRate).toFixed(1)}% estimated`,
-      avgCostPerHour: `${hourlyCost.toFixed(2)}/hr (~${(hourlyCost * 24 * 30).toFixed(0)}/30 days)`,
+      avgCostPerHour: `$${hourlyCost.toFixed(2)}/hr (~$${(hourlyCost * 24 * 30).toFixed(0)}/30 days)`,
     };
   };
 
