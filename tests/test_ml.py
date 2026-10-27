@@ -56,9 +56,14 @@ def test_engineered_lag_uses_only_prior_observations():
 
     assert len(X) == len(y)
     assert len(features) == X.shape[1]
-    # The first complete rolling-15 row is input index 14; its lag_1 is index 13.
-    assert X["lag_1"].iloc[0] == df["requests_per_second"].iloc[13]
-    assert y.iloc[0] == df["requests_per_second"].iloc[14]
+    # Every feature for a target row must come strictly from earlier observations.
+    # The shifted rolling-15 mean makes input index 15 the first complete row.
+    assert X["lag_1"].iloc[0] == df["requests_per_second"].iloc[14]
+    assert y.iloc[0] == df["requests_per_second"].iloc[15]
+    assert np.isclose(
+        X["rolling_mean_15"].iloc[0],
+        df["requests_per_second"].iloc[:15].mean(),
+    )
 
 
 def test_model_training_returns_measured_holdout_metrics(tmp_path):
