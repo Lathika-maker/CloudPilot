@@ -66,12 +66,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenStrategyInfo }) => {
             </strong>
           </div>
           <button
-            onClick={isRunning ? pauseSimulation : startSimulation}
+            onClick={() => {
+              if (!currentMetric) { setActiveTab('dataset'); return; }
+              if (isRunning) pauseSimulation(); else startSimulation();
+            }}
             className={`cp-button cp-sim-button ${isRunning ? 'is-running' : ''}`}
-            aria-label={isRunning ? 'Pause simulation' : 'Start simulation'}
+            aria-label={!currentMetric ? 'Load workload data' : isRunning ? 'Pause simulation' : 'Start simulation'}
           >
             {isRunning ? <Pause size={15} /> : <Play size={15} />}
-            <span>{isRunning ? 'Pause' : 'Run simulation'}</span>
+            <span>{!currentMetric ? 'Load data' : isRunning ? 'Pause' : 'Run simulation'}</span>
           </button>
         </div>
       </div>
