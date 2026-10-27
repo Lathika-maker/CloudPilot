@@ -242,7 +242,7 @@ export const MLModelView: React.FC = () => {
           </div>
 
           <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 text-xs text-slate-400 space-y-1 font-mono text-[11px]">
-            <p><strong>Dataset Points:</strong> {modelMetrics?.sample_size != null ? Number(modelMetrics.sample_size).toLocaleString() : '—'} records</p>
+            <p><strong>Observed History Points:</strong> {modelMetrics?.sample_size != null ? Number(modelMetrics.sample_size).toLocaleString() : '—'} records</p>
             <p><strong>Split Strategy:</strong> Chronological 80/20 (No future leakage)</p>
             <p><strong>Last Trained:</strong> {modelMetrics?.trained_at || modelMetrics?.trainedAt ? new Date(modelMetrics.trained_at || modelMetrics.trainedAt).toLocaleTimeString() : 'Not trained'}</p>
           </div>
@@ -281,7 +281,7 @@ export const MLModelView: React.FC = () => {
           <div className="h-64 w-full relative">
             {predictionPoints.length === 0 && (
               <div className="absolute inset-0 z-10 grid place-items-center rounded-lg border border-dashed border-slate-800 bg-slate-950/40 px-6 text-center text-xs leading-relaxed text-slate-500">
-                Forecast points appear after the simulation has collected at least 15 historical workload records. Start or step the simulation to build history.
+                Train the model after selecting at least 35 observed records. Forecasts use only data at or before the current playhead.
               </div>
             )}
             <ResponsiveContainer width="100%" height="100%">
