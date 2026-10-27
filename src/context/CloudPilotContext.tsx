@@ -175,10 +175,10 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   // Manual Points
   const [manualPoints, setManualPoints] = useState<ManualTimePoint[]>([
     { id: '1', time: '10:00', users: 800, requests: 220, cpu: 35, ram: 40 },
-    { id: '2', time: '10:05', users: 1500, requests: 420, cpu: 52, ram: 48 },
-    { id: '3', time: '10:10', users: 3200, requests: 880, cpu: 78, ram: 65 },
-    { id: '4', time: '10:15', users: 5100, requests: 1420, cpu: 91, ram: 78 },
-    { id: '5', time: '10:20', users: 2400, requests: 640, cpu: 55, ram: 50 },
+    { id: '2', time: '10:01', users: 1500, requests: 420, cpu: 52, ram: 48 },
+    { id: '3', time: '10:02', users: 3200, requests: 880, cpu: 78, ram: 65 },
+    { id: '4', time: '10:03', users: 5100, requests: 1420, cpu: 91, ram: 78 },
+    { id: '5', time: '10:04', users: 2400, requests: 640, cpu: 55, ram: 50 },
   ]);
 
   // Experiment Comparison
