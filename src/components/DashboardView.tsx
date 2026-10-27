@@ -1414,7 +1414,7 @@ export const DashboardView: React.FC = () => {
 
           {/* Card 8: Estimated Savings */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 shadow-sm bg-gradient-to-br from-emerald-950/30 to-slate-900">
-            <span className="text-[11px] text-emerald-400 block font-medium">Est. Savings</span>
+            <span className="text-[11px] text-emerald-400 block font-medium">Hourly Rate vs Reference</span>
             <div className="mt-1 flex items-baseline justify-between">
               <span className="text-xl font-bold font-mono text-emerald-400">
                 {savingsPercent >= 0 ? '+' : ''}{savingsPercent}%
