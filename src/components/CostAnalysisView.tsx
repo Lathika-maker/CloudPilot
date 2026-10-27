@@ -117,10 +117,10 @@ export const CostAnalysisView: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2">
             <DollarSign className="w-5 h-5 text-emerald-400" />
-            <h1 className="text-xl font-bold text-white">Cost Analysis & Academic Research Benchmark</h1>
+            <h1 className="text-xl font-bold text-white">Cost & Autoscaling Comparison</h1>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            Empirical comparative benchmark across all 3 strategies over {(dataset?.length || 0).toLocaleString()} workload steps.
+            Estimated strategy comparison from {(dataset?.length || 0).toLocaleString()} simulated workload steps. Results depend on this dataset and the selected policy.
           </p>
           {exportNotice && (
             <div className="flex items-center space-x-1.5 text-xs text-emerald-400 font-mono mt-1.5">
@@ -165,18 +165,22 @@ export const CostAnalysisView: React.FC = () => {
         </div>
       </div>
 
+      <div className="rounded-lg border border-amber-700/40 bg-amber-950/20 px-4 py-3 text-xs leading-relaxed text-amber-100/90">
+        These are simulator estimates, not live cloud bills or production measurements. Costs assume the configured per-instance hourly rate and one minute per workload point; SLA results follow this project's simplified response-time and CPU model.
+      </div>
+
       {/* Hero Cost Savings Card */}
       <div className="rounded-2xl bg-gradient-to-r from-emerald-950/60 via-slate-900 to-indigo-950/60 border border-emerald-500/30 p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-2 max-w-xl">
           <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-bold">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Empirical Findings</span>
+            <span>Simulation estimate</span>
           </div>
           <h2 className="text-2xl font-black text-white">
-            CloudPilot Achieves <span className="text-emerald-400">+{benchmarkResult.costSavingsPercent}% Cost Reduction</span>
+            CloudPilot simulated cost is <span className="text-emerald-400">{benchmarkResult.costSavingsPercent}% lower than fixed</span>
           </h2>
           <p className="text-xs text-slate-300 leading-relaxed font-sans">
-            By combining Random Forest load forecasting with 3-minute lead-time scheduling, CloudPilot saves{' '}
+            In this simulation, predictive scaling estimates{' '}
             <strong className="text-white font-mono">${benchmarkResult.costSavingsAmount.toFixed(2)}</strong> over fixed provisioning
             while cutting SLA breaches from <strong className="text-rose-400 font-mono">{benchmarkResult.reactive.slaViolations}</strong> down to{' '}
             <strong className="text-emerald-400 font-mono">{benchmarkResult.predictive.slaViolations}</strong> compared to reactive autoscaling.
@@ -185,7 +189,7 @@ export const CostAnalysisView: React.FC = () => {
 
         <div className="flex items-center gap-4 bg-slate-950/80 p-4 rounded-xl border border-slate-800 shrink-0">
           <div className="text-center px-3">
-            <span className="text-[10px] text-slate-500 uppercase block font-mono">Total Savings</span>
+            <span className="text-[10px] text-slate-500 uppercase block font-mono">Estimated Savings</span>
             <span className="text-2xl font-extrabold font-mono text-emerald-400">
               +{benchmarkResult.costSavingsPercent}%
             </span>
@@ -193,11 +197,11 @@ export const CostAnalysisView: React.FC = () => {
           </div>
           <div className="h-10 w-px bg-slate-800"></div>
           <div className="text-center px-3">
-            <span className="text-[10px] text-slate-500 uppercase block font-mono">SLA Protection</span>
+            <span className="text-[10px] text-slate-500 uppercase block font-mono">Predicted SLA</span>
             <span className="text-2xl font-extrabold font-mono text-cyan-400">
-              {benchmarkResult.predictive.slaViolations === 0 ? '100%' : '99.8%'}
+              {Math.max(0, 100 - benchmarkResult.predictive.slaViolationRate).toFixed(1)}%
             </span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">Reliability index</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">Steps within SLA (model estimate)</span>
           </div>
         </div>
       </div>
@@ -206,7 +210,7 @@ export const CostAnalysisView: React.FC = () => {
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm space-y-4">
         <h2 className="text-sm font-bold text-white flex items-center space-x-2">
           <BarChart3 className="w-4 h-4 text-cyan-400" />
-          <span>Detailed Strategy Benchmark Matrix</span>
+          <span>Simulated Strategy Comparison</span>
         </h2>
 
         <div className="overflow-x-auto border border-slate-800 rounded-lg">
