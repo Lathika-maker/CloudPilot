@@ -127,9 +127,26 @@ export const DatasetManagerView: React.FC = () => {
 
     try {
       const { metrics, missingFields } = normalizeMappedRows(parsedRows, columnMapping);
-      loadUploadedData(metrics, fileName || 'Uploaded Dataset', columnMapping);
+      const chronological = [...metrics].sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
+      const timeDiffs = chronological.slice(1).map((metric, index) =>
+        (Date.parse(metric.timestamp) - Date.parse(chronological[index].timestamp)) / 60000
+      );
+      if (timeDiffs.some((minutes) => !Number.isFinite(minutes) || minutes <= 0)) {
+        throw new Error('Timestamps must be valid, unique, and strictly increasing after sorting.');
+      }
+      const sortedDiffs = [...timeDiffs].sort((a, b) => a - b);
+      const medianInterval = sortedDiffs.length
+        ? sortedDiffs[Math.floor(sortedDiffs.length / 2)]
+        : 1;
+      if (Math.abs(medianInterval - 1) > 0.1) {
+        throw new Error(`Detected a median interval of ${medianInterval.toFixed(2)} minutes. The current simulation and cost model require one-minute records; resample the CSV to one-minute intervals before loading.`);
+      }
+      loadUploadedData(chronological, fileName || 'Uploaded Dataset', columnMapping);
       setUploadSuccess(true);
       setErrorMessage(null);
+      if (missingFields.length > 0) {
+        setMissingFieldsNotice(missingFields);
+      }
     } catch (err: any) {
       setErrorMessage(`Failed to normalize records: ${err.message}`);
     }
@@ -191,7 +208,7 @@ export const DatasetManagerView: React.FC = () => {
               </div>
               <p className="text-xs text-slate-400">
                 Total Records: <strong className="text-white font-mono">{(dataset?.length || 0).toLocaleString()} points</strong> |
-                Interval: ~1 min | Created: {datasetMeta?.created_at ? new Date(datasetMeta.created_at).toLocaleDateString() : 'Active'}
+                Interval: 1 min/row (required) | Created: {datasetMeta?.created_at ? new Date(datasetMeta.created_at).toLocaleDateString() : 'Active'}
               </p>
               {exportNotice && (
                 <div className="flex items-center space-x-1.5 text-xs text-emerald-400 font-mono mt-1">
@@ -214,6 +231,14 @@ export const DatasetManagerView: React.FC = () => {
                 <Download className="w-3.5 h-3.5 text-cyan-400" />
                 <span>Export Dataset (CSV)</span>
               </button>
+              <a
+                href="/datasets/cloudpilot_demo_workload.csv"
+                download="cloudpilot_demo_workload.csv"
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-950/60 text-cyan-200 hover:bg-cyan-900/60 border border-cyan-800"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download 1,440-row demo CSV</span>
+              </a>
               <button
                 onClick={loadSampleDataset}
                 className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-200 hover:bg-slate-700 border border-slate-700"
