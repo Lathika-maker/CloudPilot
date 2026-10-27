@@ -56,7 +56,7 @@ class WorkloadPredictor:
                 np.cos(2 * np.pi * forecast_hour / 24.0),
                 np.sin(2 * np.pi * forecast_day / 7.0),
                 np.cos(2 * np.pi * forecast_day / 7.0),
-                lag1, lag2, simulated_history[-5],
+                lag1, lag2, simulated_history[-4],
                 mean5, mean15, std5,
             ]])
 
