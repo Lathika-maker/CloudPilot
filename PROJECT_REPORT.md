@@ -1,72 +1,146 @@
-# CloudPilot AI: Academic Project Report & System Documentation
+# CloudPilot AI: Project Report
 
-**Project Title:** CloudPilot AI: An AI-Powered Predictive Cloud Resource Orchestrator for Intelligent Resource Scaling and Cost Optimization  
-**Project Category:** Cloud Computing, Distributed Systems & Applied Machine Learning  
-**Target Submission:** Final-Year Engineering / Graduate Capstone Project  
+**Project title:** CloudPilot AI — Predictive Cloud Workload Forecasting and Autoscaling Simulator  
+**Domain:** Cloud computing, time-series forecasting, resource management  
+**Project type:** Academic prototype and simulation
+
+## 1. Abstract
+
+Cloud workloads vary over time. A fixed-size fleet can waste resources during low traffic, while a reactive scaling policy may respond only after current utilization crosses a threshold. CloudPilot AI is a prototype for exploring these trade-offs. It accepts generated, uploaded, or manually entered workload data; trains a forecasting model; simulates fixed, reactive, and predictive scaling; and compares estimated compute cost, utilization, scaling actions, and simplified SLA breaches.
+
+The project combines a React/Vite interface, TypeScript simulation engines, and a FastAPI/Python API with a scikit-learn Random Forest training pipeline. The included Python dataset is a **synthetic 24-hour workload with 288 five-minute points**, not a production trace. All virtual machines and scaling actions are simulated. The application does not provision real cloud infrastructure, and cost results are model estimates rather than live provider bills.
+
+## 2. Problem statement and research gap
+
+Traditional threshold-based autoscaling observes current resource usage and then makes a scaling decision. A sudden demand increase can create a delay between the start of the surge, its detection, and the availability of extra capacity. A fixed allocation avoids some reaction delay but may keep more capacity running than the scenario requires.
+
+The project investigates this question:
+
+> On the same workload sequence, how do fixed allocation, reactive threshold scaling, and forecast-guided scaling differ in estimated cost, simulated CPU utilization, number of scaling actions, and threshold-based SLA violations?
+
+The prototype is intended to make the comparison repeatable and inspectable. It does **not** assume that predictive scaling always wins. Any savings or reliability claim must be calculated from the selected data and policy and then evaluated against a realistic workload before being generalised.
+
+## 3. Objectives
+
+1. Provide workload input through synthetic generation, CSV/JSON import in the browser, and manual entry.
+2. Implement forecasting and display out-of-sample evaluation metrics.
+3. Compare fixed, reactive, and predictive resource-allocation policies on a common workload sequence.
+4. Track simulated VM lifecycle and scaling events.
+5. Display cost and SLA estimates with the assumptions that generated them.
+6. Keep the application usable on smaller screens and make the primary workflow clear.
+
+## 4. System design
+
+### 4.1 Main components
+
+- **Frontend:** React, TypeScript, Vite, Tailwind CSS and Recharts. Views include Home, Dashboard, Dataset Manager, Manual Input, What-if Lab, Simulation, ML Pipeline, Scaling Policy, VM Fleet, Cost Analysis, Architecture Report, and AWS Deployment Guide.
+- **Browser simulation:** A shared context coordinates workload data, playhead, simulated VM state, policies, incidents, and scaling events.
+- **Browser ML engine:** A custom Random-Forest-style tree ensemble and an autoregressive linear baseline. These are the two selectable models currently exposed by the UI. The UI does not offer Gradient Boosting or LSTM because those choices were not implemented as separate models.
+- **Python API:** FastAPI with a scikit-learn Random Forest training script, feature engineering, recursive forecasting, request-driven strategy comparison, and in-memory demo cluster state.
+- **Database assets:** A PostgreSQL service, schema, and seed SQL are included. The current API simulator does not persist its VM state or telemetry to PostgreSQL.
+
+### 4.2 Workload data
+
+The browser can generate a larger synthetic sequence or accept custom data. The checked-in Python sample file, `datasets/sample_workload.csv`, contains 288 workload points at five-minute intervals with timestamp, RPS, active-user, CPU, and memory columns. It is a generated sample for development and reproducibility, not an external public production trace.
+
+Uploaded files sent to the Python `/api/dataset/upload` endpoint are validated and previewed only. That endpoint does not persist uploaded records or feed them directly into training. Browser-side file ingestion is a separate path.
+
+### 4.3 Feature engineering and forecasting
+
+The Python training path transforms timestamped RPS into cyclical time features, lagged RPS values, rolling means, and rolling standard deviation. It splits the ordered feature rows chronologically: the first 80% is the training partition and the remaining 20% is the holdout partition. Random shuffling is avoided so the validation sequence follows the temporal order.
+
+The Random Forest is fitted only on the training partition. MAE, RMSE, MAPE (excluding zero-valued actuals from the percentage denominator), and R² are calculated from the held-out predictions. Feature importance is returned from the fitted estimator. Forecasts are generated recursively from observed RPS history. The illustrative ±10% output range is not a statistically calibrated confidence interval.
+
+The browser-side implementation is separate. Its metrics are shown only after training on the selected workload; changing the dataset resets the displayed model metrics and forecast so an earlier model result cannot be mistaken for validation on the newly selected data.
+
+### 4.4 Autoscaling and cost model
+
+The simulator compares:
+
+- **Fixed allocation:** a constant configured number of instances.
+- **Reactive allocation:** scaling changes based on the current simulated utilization and policy thresholds.
+- **Predictive allocation:** the forecast is used to estimate required capacity ahead of observed future workload, subject to the implemented policy and cooldown rules.
+
+For an instance capacity (C), target utilization (U), and forecasted demand (hat{\lambda}), the nominal target fleet size is
+
+\[
+N_{target}=\max\left(N_{min},\min\left(N_{max},\left\lceil\frac{\hat{\lambda}}{C\cdot U}\right\rceil\right)\right).
+\]
+
+The cost estimate is based on the configured per-instance hourly rate and simulated instance-hours. Results are not linked to AWS billing or real VM creation. SLA breaches are simplified model events, not measured production outages.
+
+## 5. Evaluation methodology and output
+
+No universal result is asserted in this report. The application computes model metrics and strategy comparisons from the data and policy used in a particular run. The result must be recorded after running the experiment; fixed values should not be copied into the report as though they were measured.
+
+### 5.1 Model validation
+
+Record the following from the ML Pipeline page or `POST /api/train` response:
+
+| Item | What to report |
+|---|---|
+| Dataset | Source, point count, timestamp interval, target variable |
+| Split | Chronological train/test split ratio and exact sample counts |
+| Model | Browser Random-Forest-style ensemble, browser autoregressive baseline, or Python Random Forest |
+| MAE | Mean absolute error on the holdout partition, in RPS |
+| RMSE | Root mean squared error on the holdout partition, in RPS |
+| MAPE | Mean absolute percentage error on non-zero actuals; percent |
+| R² | Coefficient of determination on the holdout partition |
+| Feature scores | Computed from tree split gains or normalized baseline coefficients where available |
+
+### 5.2 Strategy comparison
+
+Use the same ordered workload sequence and policy for all three strategies. Record the actual output of the Cost Analysis page:
+
+| Metric | Fixed | Reactive | Predictive |
+|---|---:|---:|---:|
+| Estimated total cost (USD) | Run output | Run output | Run output |
+| Simulated instance-hours | Run output | Run output | Run output |
+| Average simulated CPU (%) | Run output | Run output | Run output |
+| Estimated threshold breaches | Run output | Run output | Run output |
+| Scaling actions | Run output | Run output | Run output |
+
+These entries must be populated from an actual run before submission. Cost comparisons should state the per-instance hourly rate and the workload interval. The meaning of a simulated SLA violation should also be reported, for example, the configured CPU or response-time condition that triggers it.
+
+### 5.3 Reproducibility checklist
+
+1. Identify whether the workload is synthetic, uploaded, or manually entered.
+2. Preserve the dataset or an export of the exact workload used.
+3. Record model type, training/test split, scaling thresholds, target utilization, VM capacity, cooldown, and cost per instance-hour.
+4. Train the model and save its measured holdout metrics.
+5. Re-run the strategy comparison and export the calculated results.
+6. Report unexpected or negative savings honestly; do not change assumptions solely to produce a favourable result.
+
+## 6. Limitations and future work
+
+- The browser simulator and Python API maintain separate model state and simulator state.
+- The backend API stores simulated cluster state in memory; PostgreSQL persistence is not wired up.
+- Uploads sent to the backend are previewed but are not yet included in backend model training.
+- The included workload is synthetic; it does not establish performance on an external production trace.
+- The cost and SLA models simplify provider billing, workload queues, VM boot timing, network effects, and application-level latency.
+- The AWS guide is explanatory only; this repository does not currently deploy or modify real AWS resources.
+- Further work should include a documented public dataset, benchmark scripts that record full parameters, tests of the API training and prediction path, database persistence, calibrated uncertainty estimates, and a separate cloud experiment before any real-world cost-saving claim.
+
+## 7. Viva preparation
+
+**Q1. Why compare predictive and reactive autoscaling?**  
+Reactive policies make decisions from the current state, while predictive policies attempt to use a forecast to allocate capacity earlier. The comparison measures whether the forecast changes cost and simulated breach outcomes under the same workload; predictive scaling is not guaranteed to perform better.
+
+**Q2. How is temporal data leakage limited?**  
+Training data precedes the holdout data in chronological order. The future segment is not shuffled into training. Feature engineering uses lag and rolling features derived from the ordered series.
+
+**Q3. What does MAPE mean, and what are its limits?**  
+MAPE averages absolute prediction error as a percentage of the actual value. It is undefined for actual values of zero, so the implementation omits zero-valued actuals from that metric. MAE, RMSE, and R² should also be reported.
+
+**Q4. Are the reported cloud costs real provider charges?**  
+No. They are estimates calculated from the workload, simulated fleet sizes, and the configured per-instance hourly rate. The app does not connect to provider billing APIs.
+
+**Q5. Does this project launch AWS instances?**  
+No. The current project simulates instance lifecycle and includes an explanatory AWS deployment guide. It does not include a working Terraform deployment or a real-resource autoscaling daemon.
+
+**Q6. Why are LSTM and Gradient Boosting no longer offered in the browser model selector?**  
+They were previously presented as selectable options without independent implementations; they were mapped to the same underlying model. They were removed so the UI only exposes implemented choices.
 
 ---
 
-## 1. Executive Summary & Abstract
-In modern cloud computing platforms (such as AWS, Google Cloud, and Azure), elasticity is predominantly governed by reactive threshold-based autoscalers (e.g., AWS CloudWatch Alarms coupled with Auto Scaling Groups). Reactive systems operate post-facto: only after resource utilization breaches a predetermined threshold (e.g., cluster CPU > 75% for 5 minutes) does the autoscaler initiate a scale-out action.
-
-However, real-world cloud instances (e.g., AWS EC2 instances or Docker/Kubernetes pods) incur non-trivial initialization latencies—typically 120 to 180 seconds—to allocate compute nodes, pull container images, run boot scripts, and pass Application Load Balancer (ALB) health checks. During this boot latency window, sudden traffic surges cause intense queueing delay, request timeouts (HTTP 504), and severe Service Level Agreement (SLA) violations. To prevent these violations, cloud administrators chronically overprovision static fleets, leading to 40–60% wasted expenditure during non-peak hours.
-
-**CloudPilot AI** introduces a predictive, proactive resource orchestration paradigm. By fusing time-series machine learning models (Random Forest, Gradient Boosting, and LSTM networks) with cyclical temporal feature engineering and lead-time-aware scheduling, CloudPilot accurately forecasts workload demands 10 to 15 minutes ahead. Compute resources are provisioned *before* incoming traffic arrives, effectively eliminating the boot latency penalty while maintaining an empirical **34.8% to 40.1% cloud cost reduction** compared to static allocations.
-
----
-
-## 2. Problem Statement & Mathematical Formulation
-### 2.1 The Boot Latency Penalty ($T_{boot}$)
-$$T_{boot} = T_{provision} + T_{image\_pull} + T_{startup} + T_{health\_check}$$
-In reactive systems, when arrival rate $\lambda(t)$ surges at time $t_0$, the fleet size $N$ remains static until $t_0 + T_{detection} + T_{boot}$. During this interval, per-instance load exceeds maximum throughput $C_{inst}$, causing queue accumulation:
-$$Q(t) = \int_{t_0}^t \left( \lambda(\tau) - N \cdot C_{inst} \right) d\tau$$
-
-### 2.2 Predictive Fleet Sizing Equation
-CloudPilot computes required instances $N_{target}$ using forecasted workload $\hat{\lambda}(t + \Delta)$:
-$$N_{target} = \max\left(N_{min}, \min\left(N_{max}, \left\lceil \frac{\hat{\lambda}(t + \Delta)}{C_{instance} \times U_{target}} \right\rceil\right)\right)$$
-Where:
-- $\hat{\lambda}(t + \Delta)$ is the forecasted arrival rate at horizon $\Delta = 10\text{ minutes}$.
-- $C_{instance}$ is nominal throughput capacity per VM (default: 250 RPS).
-- $U_{target}$ is the target CPU utilization (default: 70%).
-
----
-
-## 3. Machine Learning Pipeline
-### 3.1 Feature Engineering
-Raw timestamped metrics are transformed into 10 high-signal ML features:
-1. **Diurnal Cycle:** $\sin\left(\frac{2\pi \cdot h}{24}\right)$ and $\cos\left(\frac{2\pi \cdot h}{24}\right)$
-2. **Weekly Cycle:** $\sin\left(\frac{2\pi \cdot d}{7}\right)$ and $\cos\left(\frac{2\pi \cdot d}{7}\right)$
-3. **Autoregressive Lags:** $\lambda_{t-1}, \lambda_{t-2}, \lambda_{t-5}$
-4. **Moving Indicators:** Rolling mean (5m, 15m) and Rolling standard deviation (5m).
-
-### 3.2 Chronological Validation
-Workload time-series data contains strict autocorrelation. Traditional random shuffle train-test splits cause **lookahead data leakage**. CloudPilot enforces strict chronological splitting:
-- First 80% chronologically: Training partition
-- Subsequent 20% chronologically: Out-of-sample evaluation partition
-
----
-
-## 4. Empirical Evaluation & Cost Benchmark
-Across 10,000 production trace intervals:
-| Evaluation Metric | Fixed Fleet (6 VMs) | Reactive (Thresholds) | CloudPilot AI (Predictive) |
-| :--- | :--- | :--- | :--- |
-| **Total Cloud Cost ($)** | $288.00 | $218.40 | **$172.50** |
-| **Cost Savings vs Fixed** | Baseline (0%) | 24.1% | **40.1%** |
-| **SLA Violations (>90% CPU)** | 3 breaches | 18 breaches (Boot lag) | **1 breach (Proactive)** |
-| **Average CPU Utilization** | 32.4% (Wasteful) | 61.2% | **73.8% (Optimal)** |
-| **Scaling Actions** | 0 (Static) | 42 actions | 26 actions (Stabilized) |
-
----
-
-## 5. Viva Defense Q&A Master Guide
-**Q1: Why is Random Forest preferred over pure deep learning (LSTM) for standard cloud metrics?**  
-*Answer:* While LSTMs capture complex non-linear temporal sequences, tabular time-series with cyclical features and lag windows perform exceptionally well with Random Forests. Random Forests train in seconds rather than hours, require zero GPU infrastructure, do not suffer from vanishing gradients, and provide direct feature importance interpretability for cloud operators.
-
-**Q2: How does CloudPilot prevent scaling oscillation (flapping)?**  
-*Answer:* Flapping is prevented through three distinct mechanisms:
-1. **Hysteresis Thresholds:** Scale-up triggers when forecast indicates CPU > 75%, but scale-down triggers only when CPU < 30%.
-2. **Cooldown Timer:** A minimum lock-out window (default 180s) prohibits scale-down actions immediately after a scale-up.
-3. **Rolling Horizon Smoothing:** Short erratic spikes are dampened by 5-minute rolling averages.
-
----
-*Report generated for CloudPilot AI - Academic Project Defense.*
+*Prepared as project documentation for CloudPilot AI. Populate the evaluation tables with measured outputs from the exact experiment used for submission.*
