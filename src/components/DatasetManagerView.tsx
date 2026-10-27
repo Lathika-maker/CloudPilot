@@ -331,7 +331,7 @@ export const DatasetManagerView: React.FC = () => {
 
                 {missingFieldsNotice.length > 0 && (
                   <div className="p-3 rounded-lg bg-amber-950/40 border border-amber-700/60 text-amber-300 text-xs">
-                    <strong>Notice:</strong> The following optional fields were not found in your file: [{missingFieldsNotice.join(', ')}]. Unmapped fields use simulator-only estimates for compatibility; they are not observations from your source dataset.
+                    <strong>Data provenance:</strong> These source fields are unmapped or unavailable: [{missingFieldsNotice.join(', ')}]. The simulator fills its fixed internal schema with estimates for compatibility; these are not observations from your file. For a generic load signal, calibrate instance capacity to the signal's units before interpreting autoscaling or cost results.
                   </div>
                 )}
 
@@ -346,7 +346,7 @@ export const DatasetManagerView: React.FC = () => {
                         onChange={(e) => setColumnMapping({ ...columnMapping, [field.key]: e.target.value })}
                         className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-200 text-xs font-mono"
                       >
-                        <option value="">-- None (Auto Estimate) --</option>
+                        <option value="">-- None (not observed; simulator estimate) --</option>
                         {detectedHeaders.map((h) => (
                           <option key={h} value={h}>
                             {h}
