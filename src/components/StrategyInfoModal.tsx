@@ -33,7 +33,7 @@ export const StrategyInfoModal: React.FC<StrategyInfoModalProps> = ({ isOpen, on
   const getImpact = (strategy: 'fixed' | 'reactive' | 'predictive') => {
     if (!comparison || dataset.length === 0) {
       return {
-        instances: strategy === 'fixed' ? '6 static VMs' : 'Workload-dependent',
+        instances: strategy === 'fixed' ? '6 VMs if simulated' : 'Workload-dependent',
         slaCompliance: 'Not evaluated — load data',
         avgCostPerHour: 'Not evaluated — load data',
       };
