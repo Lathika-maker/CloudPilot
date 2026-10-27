@@ -10,7 +10,7 @@ CloudPilot AI is a cloud-computing project that explores whether workload foreca
 
 ### Workload input and simulation
 - Built-in **synthetic** workload generation, including daily traffic patterns and occasional spikes. The app starts with no active dataset; loading data is an explicit user action.
-- Browser-based CSV/JSON dataset import and column mapping. The included upload-test file is `public/datasets/cloudpilot_demo_workload.csv` (1,440 rows at one-minute intervals).
+- Browser-based CSV/JSON ingestion with quoted CSV fields, automatic semantic column detection, manual column mapping, Unix/date timestamp parsing, and support for any positive sampling cadence and irregular gaps. The included upload-test file is `public/datasets/cloudpilot_demo_workload.csv` (1,440 rows at one-minute intervals).
 - Manual workload input and editable workload points.
 - A dashboard for simulated workload, VM lifecycle, scaling decisions, resource alarms, and failure-injection scenarios.
 
@@ -23,7 +23,7 @@ CloudPilot AI is a cloud-computing project that explores whether workload foreca
 
 ### Cost analysis and export
 - Side-by-side strategy comparison runs on the active workload and configured policy.
-- Costs are estimated from the configured per-instance hourly rate and the time interval assigned to each workload point.
+- Costs are estimated from the configured per-instance hourly rate and observed timestamp intervals (the final row uses the dataset's median interval).
 - CSV and JSON exports support further analysis. Exported estimates should be accompanied by the workload source, point interval, policy values, and model validation results.
 
 ### Deployment and data persistence
@@ -135,7 +135,7 @@ For an academic or research submission, record the dataset source and time inter
 ## Current limitations
 
 - The browser simulator and Python API maintain separate state and model artifacts.
-- Uploaded files sent to the Python API are validated and previewed, not persisted or trained automatically.
+- Uploaded files sent to the Python API are validated and previewed, not persisted or trained automatically. Browser ingestion currently normalizes data into a fixed CloudPilot schema; missing metrics are simulator-only estimates and must not be presented as observed source telemetry. If a generic column is mapped as the primary load signal, configure instance capacity in matching units and treat scaling/cost outputs as a calibrated simulation, not provider-accurate forecasts.
 - The PostgreSQL schema is present, but API persistence is not connected.
 - The AWS guide does not deploy infrastructure.
 - The workload and cost models simplify provider billing, boot latency, queueing, and SLA behavior; the simulator should not be used as a production controller.
