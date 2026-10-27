@@ -259,13 +259,21 @@ export function normalizeMappedRows(
       validTime = new Date(Date.now() + index * 60000).toISOString();
     }
 
-    const cpu = mapping.cpu_usage ? parseFloat(row[mapping.cpu_usage]) || 50 : 50;
-    const mem = mapping.memory_usage ? parseFloat(row[mapping.memory_usage]) || 40 : 40;
-    const net = mapping.network_usage ? parseFloat(row[mapping.network_usage]) || 12 : 12;
-    const rps = mapping.requests_per_second ? parseFloat(row[mapping.requests_per_second]) || 300 : 300;
-    const users = mapping.active_users ? parseFloat(row[mapping.active_users]) || Math.round(rps * 3.5) : Math.round(rps * 3.5);
-    const rt = mapping.response_time ? parseFloat(row[mapping.response_time]) || 24 : 24;
-    const inst = mapping.active_instances ? parseInt(row[mapping.active_instances], 10) || Math.max(1, Math.ceil(rps / 250)) : Math.max(1, Math.ceil(rps / 250));
+    // Preserve legitimate zero values. Using parseFloat(value) || fallback would
+    // incorrectly turn zero CPU, memory, RPS, and users into fabricated observations.
+    const readNumber = (target: string, fallback: number): number => {
+      const source = mapping[target];
+      if (!source || row[source] == null || row[source].trim() === '') return fallback;
+      const parsed = Number(row[source]);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+    const cpu = readNumber('cpu_usage', 50);
+    const mem = readNumber('memory_usage', 40);
+    const net = readNumber('network_usage', 12);
+    const rps = readNumber('requests_per_second', 300);
+    const users = readNumber('active_users', Math.round(rps * 3.5));
+    const rt = readNumber('response_time', 24);
+    const inst = Math.trunc(readNumber('active_instances', Math.max(1, Math.ceil(rps / 250))));
 
     return {
       timestamp: validTime,
