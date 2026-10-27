@@ -177,11 +177,11 @@ export const CostAnalysisView: React.FC = () => {
             <span>Simulation estimate</span>
           </div>
           <h2 className="text-2xl font-black text-white">
-            CloudPilot simulated cost is <span className="text-emerald-400">{benchmarkResult.costSavingsPercent}% lower than fixed</span>
+            Predictive scaling is <span className="text-emerald-400">{Math.abs(benchmarkResult.costSavingsPercent)}% {benchmarkResult.costSavingsPercent >= 0 ? 'lower cost' : 'higher cost'}</span> than fixed
           </h2>
           <p className="text-xs text-slate-300 leading-relaxed font-sans">
             In this simulation, predictive scaling estimates{' '}
-            <strong className="text-white font-mono">${benchmarkResult.costSavingsAmount.toFixed(2)}</strong> over fixed provisioning
+            <strong className="text-white font-mono" >/strong> over fixed provisioning
             while cutting SLA breaches from <strong className="text-rose-400 font-mono">{benchmarkResult.reactive.slaViolations}</strong> down to{' '}
             <strong className="text-emerald-400 font-mono">{benchmarkResult.predictive.slaViolations}</strong> compared to reactive autoscaling.
           </p>
@@ -193,7 +193,7 @@ export const CostAnalysisView: React.FC = () => {
             <span className="text-2xl font-extrabold font-mono text-emerald-400">
               +{benchmarkResult.costSavingsPercent}%
             </span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">${benchmarkResult.costSavingsAmount.toFixed(2)} saved</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">${Math.abs(benchmarkResult.costSavingsAmount).toFixed(2)} {benchmarkResult.costSavingsAmount >= 0 ? 'estimated savings' : 'estimated additional cost'}</span>
           </div>
           <div className="h-10 w-px bg-slate-800"></div>
           <div className="text-center px-3">
