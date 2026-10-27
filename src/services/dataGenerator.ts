@@ -169,18 +169,45 @@ export function parseCSVData(csvText: string): {
   rows: Record<string, string>[];
   preview: Record<string, string>[];
 } {
-  const lines = csvText.trim().split(/\r?\n/);
-  if (lines.length < 2) {
+  // Parse RFC-4180-style quoted fields (including commas, escaped quotes, and
+  // line breaks inside quoted cells) instead of splitting each line on commas.
+  const matrix: string[][] = [];
+  let row: string[] = [];
+  let cell = '';
+  let quoted = false;
+  for (let i = 0; i < csvText.length; i++) {
+    const ch = csvText[i];
+    if (ch === '"') {
+      if (quoted && csvText[i + 1] === '"') {
+        cell += '"';
+        i++;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (ch === ',' && !quoted) {
+      row.push(cell.trim());
+      cell = '';
+    } else if ((ch === '\n' || ch === '\r') && !quoted) {
+      if (ch === '\r' && csvText[i + 1] === '\n') i++;
+      row.push(cell.trim());
+      if (row.some((value) => value !== '')) matrix.push(row);
+      row = [];
+      cell = '';
+    } else {
+      cell += ch;
+    }
+  }
+  if (quoted) throw new Error('CSV contains an unclosed quoted field.');
+  row.push(cell.trim());
+  if (row.some((value) => value !== '')) matrix.push(row);
+  if (matrix.length < 2) {
     throw new Error('CSV file must have at least a header row and one data row.');
   }
 
-  const headers = lines[0].split(',').map((h) => h.trim().replace(/^["']|["']$/g, ''));
+  const headers = matrix[0].map((h) => h.replace(/^['"]|['"]$/g, '').trim());
+  if (headers.some((h) => !h)) throw new Error('CSV contains an empty column name.');
   const rows: Record<string, string>[] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    const cols = line.split(',').map((c) => c.trim().replace(/^["']|["']$/g, ''));
+  for (const cols of matrix.slice(1)) {
     const rowObj: Record<string, string> = {};
     headers.forEach((h, idx) => {
       rowObj[h] = cols[idx] !== undefined ? cols[idx] : '';
@@ -213,7 +240,7 @@ export function autoMapColumns(headers: string[]): Record<string, string> {
   const lowerHeaders = headers.map((h) => h.toLowerCase().replace(/[\s_\-]/g, ''));
 
   const patterns: Record<string, RegExp[]> = {
-    timestamp: [/time/, /date/, /timestamp/, /ts/, /datetime/],
+    timestamp: [/timestamp|datetime|epochtime|unixtime/, /^time$/, /^date$/, /^ts$/],
     cpu_usage: [/cpu/, /cpuutil/, /cpuusage/, /processor/],
     memory_usage: [/mem/, /ram/, /memory/, /memoryutil/],
     network_usage: [/net/, /network/, /bandwidth/, /io/, /throughput/],
@@ -260,7 +287,10 @@ export function normalizeMappedRows(
     'cpu_usage', 'memory_usage', 'network_usage', 'requests_per_second',
     'active_users', 'response_time', 'active_instances',
   ];
-  const missingFields = telemetryTargets.filter((field) => !mapping[field]);
+  const missingFields = [
+    ...(!mapping.timestamp ? ['timestamp (generated because the source has no timestamp column)'] : []),
+    ...telemetryTargets.filter((field) => !mapping[field]),
+  ];
 
   const metrics: WorkloadMetric[] = rows.map((row, index) => {
     const rawTime = mapping.timestamp ? row[mapping.timestamp] : '';
