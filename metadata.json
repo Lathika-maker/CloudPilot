@@ -1,0 +1,6 @@
+{
+  "name": "CloudPilot AI",
+  "description": "AI-Powered Predictive Cloud Resource Orchestrator for Intelligent Resource Scaling and Cost Optimization",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
