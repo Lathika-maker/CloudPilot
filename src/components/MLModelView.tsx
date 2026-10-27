@@ -113,15 +113,15 @@ export const MLModelView: React.FC = () => {
             <span>{isTraining ? 'Training...' : 'Retrain Model'}</span>
           </button>
         </div>
-        {trainingMessage && (
-          <div
-            role="status"
-            className={`mt-3 rounded-lg border px-3 py-2 text-xs leading-relaxed ${trainingMessage.success ? 'border-emerald-800/60 bg-emerald-950/20 text-emerald-200' : 'border-rose-800/60 bg-rose-950/20 text-rose-200'}`}
-          >
-            {trainingMessage.message}
-          </div>
-        )}
       </div>
+      {trainingMessage && (
+        <div
+          role="status"
+          className={`rounded-lg border px-3 py-2 text-xs leading-relaxed ${trainingMessage.success ? 'border-emerald-800/60 bg-emerald-950/20 text-emerald-200' : 'border-rose-800/60 bg-rose-950/20 text-rose-200'}`}
+        >
+          {trainingMessage.message}
+        </div>
+      )}
 
       {/* Model Evaluation Metrics Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
