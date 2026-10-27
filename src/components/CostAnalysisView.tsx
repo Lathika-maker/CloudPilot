@@ -177,7 +177,7 @@ export const CostAnalysisView: React.FC = () => {
             <span>Simulation estimate</span>
           </div>
           <h2 className="text-2xl font-black text-white">
-            Predictive scaling is <span className="text-emerald-400">{Math.abs(benchmarkResult.costSavingsPercent)}% {benchmarkResult.costSavingsPercent >= 0 ? 'lower cost' : 'higher cost'}</span> than fixed
+            Predictive scaling is <span className={benchmarkResult.costSavingsPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{Math.abs(benchmarkResult.costSavingsPercent)}% {benchmarkResult.costSavingsPercent >= 0 ? 'lower cost' : 'higher cost'}</span> than fixed
           </h2>
           <p className="text-xs text-slate-300 leading-relaxed font-sans">
             Estimated predictive cost is <strong className="text-white font-mono">${benchmarkResult.predictive.totalCost.toFixed(2)}</strong> versus
