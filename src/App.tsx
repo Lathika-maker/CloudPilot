@@ -18,7 +18,7 @@ import { NoDatasetState } from './components/NoDatasetState';
 
 const MainContent: React.FC = () => {
   const { activeTab, dataset, loadSampleDataset, setActiveTab } = useCloudPilot();
-  const needsWorkload = ['dashboard', 'what-if', 'simulation', 'ml', 'scaling', 'instances', 'cost'].includes(activeTab);
+  const needsWorkload = ['dashboard', 'simulation', 'ml', 'scaling', 'instances', 'cost'].includes(activeTab);
 
   if (dataset.length === 0 && needsWorkload) {
     const isMl = activeTab === 'ml';
