@@ -35,7 +35,7 @@ export const HomeView: React.FC = () => {
         <div className="relative z-10 max-w-3xl">
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-medium mb-4">
             <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Autonomous Cloud Resource Orchestrator & Cost Optimizer</span>
+            <span>Predictive Cloud Resource Orchestration Simulator</span>
           </div>
 
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight leading-tight">
@@ -63,7 +63,7 @@ export const HomeView: React.FC = () => {
             </span>
             <span className="flex items-center space-x-1 bg-slate-800/80 px-2.5 py-1 rounded border border-slate-700">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Docker & AWS deployment blueprint</span>
+              <span>Docker simulation & AWS architecture examples</span>
             </span>
           </div>
         </div>
