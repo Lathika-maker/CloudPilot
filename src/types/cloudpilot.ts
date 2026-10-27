@@ -155,6 +155,7 @@ export type FailureType =
   | 'memory_leak'
   | 'traffic_surge'
   | 'traffic_drop'
+  | 'latency_degradation'
   | 'server_failure';
 
 export interface FailureIncident {
@@ -164,6 +165,8 @@ export interface FailureIncident {
   timestamp: string;
   resolved: boolean;
   affectedInstanceId?: string;
+  affectedIndex?: number;
+  originalMetric?: WorkloadMetric;
 }
 
 export interface ManualTimePoint {
