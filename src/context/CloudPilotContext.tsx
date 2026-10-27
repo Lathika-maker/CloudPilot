@@ -43,15 +43,6 @@ export const DEFAULT_ALERT_CONFIG: AlertThresholdConfig = {
   soundAlert: false,
 };
 
-export interface StrategyNotice {
-  strategy: 'fixed' | 'reactive' | 'predictive';
-  title: string;
-  message: string;
-  instances: number;
-  hourlyCost: number;
-  timestamp: number;
-}
-
 interface CloudPilotContextType {
   // Navigation
   activeTab: string;
@@ -84,8 +75,6 @@ interface CloudPilotContextType {
   scalingEvents: ScalingEvent[];
   activeStrategy: 'fixed' | 'reactive' | 'predictive';
   setActiveStrategy: (strategy: 'fixed' | 'reactive' | 'predictive') => void;
-  strategyNotice: StrategyNotice | null;
-  dismissStrategyNotice: () => void;
   getInstanceCountForStep: (stepIndex: number, fallbackMetric?: WorkloadMetric) => number;
 
   // Load Balancer
@@ -361,8 +350,6 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setIsRunning(false);
   }, []);
 
-  const [strategyNotice, setStrategyNotice] = useState<StrategyNotice | null>(null);
-  const dismissStrategyNotice = useCallback(() => setStrategyNotice(null), []);
   const simulatedInstancesMap = useRef<Record<number, number>>({});
 
   const resizeInstancesList = useCallback(
@@ -477,20 +464,6 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       };
       setScalingEvents((prev) => [event, ...prev].slice(0, 100));
 
-      // Trigger user-visible toast
-      const stratTitles = {
-        fixed: 'Fixed Allocation Active',
-        reactive: 'Reactive Autoscaling Active',
-        predictive: 'CloudPilot Predictive AI Active',
-      };
-      setStrategyNotice({
-        strategy: newStrategy,
-        title: stratTitles[newStrategy],
-        message: explanation,
-        instances: targetCount,
-        hourlyCost: Number((targetCount * scalingPolicy.costPerInstanceHour).toFixed(2)),
-        timestamp: Date.now(),
-      });
     },
     [dataset, currentIndex, virtualInstances, scalingPolicy, futurePredictions, resizeInstancesList]
   );
@@ -1025,8 +998,6 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         scalingEvents,
         activeStrategy,
         setActiveStrategy: handleSetActiveStrategy,
-        strategyNotice,
-        dismissStrategyNotice,
         getInstanceCountForStep,
         lbAlgorithm,
         setLbAlgorithm,
