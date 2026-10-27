@@ -63,7 +63,7 @@ def train_predictive_model(csv_path: str, model_save_path: str = "model.pkl", sp
     print("CloudPilot Model Evaluation Metrics:")
     print(f"MAE:  {mae:.2f} RPS")
     print(f"RMSE: {rmse:.2f} RPS")
-    print(f"MAPE: {mape:.2f}%")
+    print(f"MAPE: {mape:.2f}%" if mape is not None else "MAPE: not defined (no non-zero actual values)")
     print(f"R²:   {r2:.4f}")
     print("=" * 45)
 
