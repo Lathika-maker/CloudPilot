@@ -77,26 +77,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenStrategyInfo }) => {
       </div>
 
       <div className="cp-nav-row">
-        <nav className="cp-nav-wide" aria-label="Primary navigation">
-          {groups.map((group) => (
-            <div className="cp-nav-group" key={group.label}>
-              <span className="cp-nav-group-label">{group.label}</span>
-              <div className="cp-nav-group-items">
-                {group.items.map((item) => {
-                  const Icon = item.icon;
-                  const active = activeTab === item.id;
-                  return (
-                    <button key={item.id} id={`nav-tab-${item.id}`} onClick={() => navigate(item.id)}
-                      aria-current={active ? 'page' : undefined} className={`cp-nav-item ${active ? 'active' : ''}`}>
-                      <Icon size={15} strokeWidth={1.8} /><span>{item.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </nav>
-        <div className="cp-nav-compact">
+       <div className="cp-nav-compact">
           <button className="cp-current-page" onClick={() => setGroupOpen(!groupOpen)} aria-expanded={groupOpen}>
             {React.createElement(selected.icon, { size: 16 })}
             <span>{selected.label}</span>
