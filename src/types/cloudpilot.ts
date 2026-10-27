@@ -21,7 +21,7 @@ export interface DatasetMeta {
 }
 
 export interface MLModelConfig {
-  modelType: 'random_forest' | 'autoregressive' | 'lstm_sim';
+  modelType: 'random_forest' | 'autoregressive';
   targetMetric: 'requests_per_second' | 'active_users';
   horizonMinutes: number;
   trainRatio: number;
@@ -32,9 +32,7 @@ export type AutoscalingStrategy = 'fixed' | 'reactive' | 'predictive';
 
 export type MLAlgorithm =
   | 'Random Forest Regressor'
-  | 'Autoregressive / Moving Average'
-  | 'Gradient Boosting / XGBoost'
-  | 'LSTM Neural Network';
+  | 'Autoregressive / Moving Average';
 
 export interface MLMetrics {
   mae: number;
