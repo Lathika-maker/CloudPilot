@@ -59,7 +59,7 @@ The simulator compares:
 
 - **Fixed allocation:** a constant configured number of instances.
 - **Reactive allocation:** scaling changes based on the current simulated utilization and policy thresholds.
-- **Predictive allocation:** the forecast is used to estimate required capacity ahead of observed future workload, subject to the implemented policy and cooldown rules.
+- **Predictive allocation in Cost Analysis:** uses a five-step linear-trend estimate based only on current and prior RPS rows; it is a comparison baseline, not the trained browser ML model. The separate browser ML-driven scaling path uses the trained model's forecast when available and remains simulation-only.
 
 For an instance capacity (C), target utilization (U), and forecasted demand (hat{\lambda}), the nominal target fleet size is
 
