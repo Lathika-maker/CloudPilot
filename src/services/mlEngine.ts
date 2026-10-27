@@ -454,7 +454,7 @@ export class MLEngine {
     const r2 =
       totalSumSquares === 0
         ? 1.0
-        : Math.max(-1.0, Math.min(0.99, Math.round((1 - sumSqErr / totalSumSquares) * 1000) / 1000));
+        : Math.round((1 - sumSqErr / totalSumSquares) * 1000) / 1000;
     const mape = percentageErrorCount > 0
       ? Math.round((sumAbsolutePercentageError / percentageErrorCount) * 1000) / 10
       : undefined;
