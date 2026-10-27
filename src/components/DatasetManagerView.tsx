@@ -134,14 +134,14 @@ export const DatasetManagerView: React.FC = () => {
       if (timeDiffs.some((minutes) => !Number.isFinite(minutes) || minutes <= 0)) {
         throw new Error('Timestamps must be valid, unique, and strictly increasing after sorting.');
       }
+      // Accept any positive sampling interval and irregular time gaps. Downstream
+      // cost calculations use actual timestamps; the UI reports the median cadence.
       const sortedDiffs = [...timeDiffs].sort((a, b) => a - b);
       const medianInterval = sortedDiffs.length
         ? sortedDiffs[Math.floor(sortedDiffs.length / 2)]
         : 1;
-      if (timeDiffs.some((minutes) => Math.abs(minutes - 1) > 0.1)) {
-        throw new Error(`Detected a median interval of ${medianInterval.toFixed(2)} minutes and/or irregular gaps. The current simulation and cost model require every row to be one minute apart; resample the CSV to one-minute intervals before loading.`);
-      }
       loadUploadedData(chronological, fileName || 'Uploaded Dataset', columnMapping);
+      setExportNotice(`Detected median sampling interval: ${medianInterval.toFixed(2)} minutes`);
       setUploadSuccess(true);
       setErrorMessage(null);
       if (missingFields.length > 0) {
@@ -208,7 +208,7 @@ export const DatasetManagerView: React.FC = () => {
               </div>
               <p className="text-xs text-slate-400">
                 Total Records: <strong className="text-white font-mono">{(dataset?.length || 0).toLocaleString()} points</strong> |
-                Interval: 1 min/row (required) | Created: {datasetMeta?.created_at ? new Date(datasetMeta.created_at).toLocaleDateString() : 'Active'}
+                Median interval: {dataset.length > 1 ? (() => { const diffs = dataset.slice(1).map((m, i) => (Date.parse(m.timestamp) - Date.parse(dataset[i].timestamp)) / 60000).filter((n) => Number.isFinite(n) && n > 0).sort((a, b) => a - b); return diffs.length ? `${diffs[Math.floor(diffs.length / 2)].toFixed(2)} min/row` : 'unknown'; })() : 'not available'} | Created: {datasetMeta?.created_at ? new Date(datasetMeta.created_at).toLocaleDateString() : 'Active'}
               </p>
               {exportNotice && (
                 <div className="flex items-center space-x-1.5 text-xs text-emerald-400 font-mono mt-1">
