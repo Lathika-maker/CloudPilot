@@ -178,7 +178,7 @@ export const StrategyInfoModal: React.FC<StrategyInfoModalProps> = ({ isOpen, on
             </div>
             <div className="flex items-center space-x-1.5">
               <DollarSign className="w-3.5 h-3.5 text-amber-400" />
-              <span>{dataset.length > 0 ? `${currentCost}/hr` : 'Cost —'}</span>
+              <span>{dataset.length > 0 ? `$${currentCost}/hr` : 'Cost —'}</span>
             </div>
           </div>
         </div>
