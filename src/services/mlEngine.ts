@@ -26,6 +26,7 @@ interface TreeNode {
   value?: number;
   featureIndex?: number;
   threshold?: number;
+  gain?: number;
   left?: TreeNode;
   right?: TreeNode;
 }
@@ -132,6 +133,7 @@ class DecisionTreeRegressor {
       isLeaf: false,
       featureIndex: bestFeatureIndex,
       threshold: bestThreshold,
+      gain: bestVarReduction * nSamples,
       left: this.buildTree(leftX, leftY, depth + 1),
       right: this.buildTree(rightX, rightY, depth + 1),
     };
@@ -148,6 +150,20 @@ class DecisionTreeRegressor {
       }
     }
     return node.value ?? 0;
+  }
+
+  getFeatureImportances(featureCount: number): number[] {
+    const importances = new Array(featureCount).fill(0);
+    const visit = (node: TreeNode | null | undefined) => {
+      if (!node || node.isLeaf) return;
+      if (node.featureIndex !== undefined && node.featureIndex >= 0 && node.featureIndex < featureCount) {
+        importances[node.featureIndex] += node.gain ?? 0;
+      }
+      visit(node.left);
+      visit(node.right);
+    };
+    visit(this.root);
+    return importances;
   }
 }
 
@@ -198,6 +214,17 @@ export class RandomForestRegressor {
     const mean = preds.reduce((a, b) => a + b, 0) / preds.length;
     const variance = preds.reduce((sum, p) => sum + Math.pow(p - mean, 2), 0) / preds.length;
     return { mean, std: Math.sqrt(variance) };
+  }
+
+  getFeatureImportances(featureCount: number): number[] {
+    const totals = new Array(featureCount).fill(0);
+    for (const tree of this.trees) {
+      tree.getFeatureImportances(featureCount).forEach((gain, index) => {
+        totals[index] += gain;
+      });
+    }
+    const total = totals.reduce((sum, value) => sum + value, 0);
+    return total > 0 ? totals.map((value) => value / total) : totals;
   }
 }
 
@@ -250,6 +277,12 @@ export class AutoregressiveModel {
 
   predict(X: number[][]): number[] {
     return X.map((r) => this.predictRow(r));
+  }
+
+  getFeatureImportances(): number[] {
+    const magnitudes = this.weights.map((weight) => Math.abs(weight));
+    const total = magnitudes.reduce((sum, value) => sum + value, 0);
+    return total > 0 ? magnitudes.map((value) => value / total) : magnitudes;
   }
 }
 
@@ -384,11 +417,13 @@ export class MLEngine {
       const rf = new RandomForestRegressor(16, 7);
       rf.fit(X_train, y_train);
       this.rfModel = rf;
+      this.arModel = null;
       testPredictions = rf.predict(X_test);
     } else {
       const ar = new AutoregressiveModel();
       ar.fit(X_train, y_train);
       this.arModel = ar;
+      this.rfModel = null;
       testPredictions = ar.predict(X_test);
     }
 
@@ -396,14 +431,22 @@ export class MLEngine {
     const n = y_test.length;
     let sumAbsErr = 0;
     let sumSqErr = 0;
+    let sumAbsolutePercentageError = 0;
+    let percentageErrorCount = 0;
     const yTestMean = y_test.reduce((a, b) => a + b, 0) / n;
     let totalSumSquares = 0;
 
     for (let i = 0; i < n; i++) {
-      const err = y_test[i] - testPredictions[i];
+      const actual = y_test[i];
+      const err = actual - testPredictions[i];
       sumAbsErr += Math.abs(err);
       sumSqErr += err * err;
-      totalSumSquares += Math.pow(y_test[i] - yTestMean, 2);
+      totalSumSquares += Math.pow(actual - yTestMean, 2);
+      // MAPE is undefined for zero-valued targets; omit those points from its denominator.
+      if (Math.abs(actual) > Number.EPSILON) {
+        sumAbsolutePercentageError += Math.abs(err / actual);
+        percentageErrorCount += 1;
+      }
     }
 
     const mae = Math.round((sumAbsErr / n) * 100) / 100;
@@ -412,22 +455,30 @@ export class MLEngine {
       totalSumSquares === 0
         ? 1.0
         : Math.max(-1.0, Math.min(0.99, Math.round((1 - sumSqErr / totalSumSquares) * 1000) / 1000));
+    const mape = percentageErrorCount > 0
+      ? Math.round((sumAbsolutePercentageError / percentageErrorCount) * 1000) / 10
+      : undefined;
 
-    // Calculate feature importances
-    const featureWeights = [
-      { name: 'Lag 1 (Immediate Previous Load)', weight: 0.32 },
-      { name: 'Rolling Mean 5m', weight: 0.24 },
-      { name: 'Rolling Mean 15m', weight: 0.16 },
-      { name: 'Hour (Diurnal Component)', weight: 0.12 },
-      { name: 'Lag 2', weight: 0.08 },
-      { name: 'Trend Delta', weight: 0.05 },
-      { name: 'Rolling Volatility Std', weight: 0.03 },
+    // Derive feature scores from observed tree split gains or normalized baseline coefficient magnitudes.
+    const featureNames = [
+      'hour_sin', 'hour_cos', 'minute_sin', 'minute_cos', 'day_of_week',
+      'lag_1', 'lag_2', 'lag_5', 'rolling_mean_5m', 'rolling_mean_15m',
+      'rolling_std_5m', 'trend_delta',
     ];
+    const rawFeatureScores = this.currentConfig.modelType === 'autoregressive'
+      ? (this.arModel?.getFeatureImportances() ?? [])
+      : (this.rfModel?.getFeatureImportances(featureNames.length) ?? []);
+    const scoreTotal = rawFeatureScores.reduce((sum, value) => sum + value, 0);
+    const featureWeights = featureNames.map((name, index) => ({
+      name,
+      weight: scoreTotal > 0 ? rawFeatureScores[index] / scoreTotal : 0,
+    }));
 
     this.metrics = {
       mae,
       rmse,
       r2,
+      mape,
       sampleCount: data.length,
       trainedAt: new Date().toISOString(),
       modelType: this.currentConfig.modelType,
