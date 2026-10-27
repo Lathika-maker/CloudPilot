@@ -10,7 +10,6 @@ import {
   Layers,
   Sparkles,
   Upload,
-  Layers,
 } from 'lucide-react';
 
 export const HomeView: React.FC = () => {
