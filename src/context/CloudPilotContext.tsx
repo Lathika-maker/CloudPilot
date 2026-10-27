@@ -312,6 +312,7 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setCurrentIndex(0);
     setScalingEvents([]);
     setIsRunning(false);
+    globalMLEngine.reset();
     setMlMetrics(null);
     setIsModelTrained(false);
     setFuturePredictions([]);
@@ -333,7 +334,8 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setCurrentIndex(0);
       setScalingEvents([]);
       setIsRunning(false);
-      setMlMetrics(null);
+      globalMLEngine.reset();
+    setMlMetrics(null);
       setIsModelTrained(false);
       setFuturePredictions([]);
     },
@@ -355,6 +357,7 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setCurrentIndex(0);
     setScalingEvents([]);
     setIsRunning(false);
+    globalMLEngine.reset();
     setMlMetrics(null);
     setIsModelTrained(false);
     setFuturePredictions([]);
@@ -869,7 +872,8 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setFuturePredictions([]);
       }
     } else {
-      setMlMetrics(null);
+      globalMLEngine.reset();
+    setMlMetrics(null);
       setIsModelTrained(false);
       setFuturePredictions([]);
     }
