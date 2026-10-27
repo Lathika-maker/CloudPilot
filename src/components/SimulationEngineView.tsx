@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useCloudPilot } from '../context/CloudPilotContext';
+import { FailureType } from '../types/cloudpilot';
 import { ExportCSVModal } from './ExportCSVModal';
 import {
   Activity,
@@ -57,14 +58,9 @@ export const SimulationEngineView: React.FC = () => {
   const [anomalyNotice, setAnomalyNotice] = useState<string | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
-  const handleAnomaly = (type: 'SPIKE_TRAFFIC_300' | 'DROP_TRAFFIC_80' | 'KILL_RANDOM_INSTANCE' | 'LATENCY_DEGRADATION') => {
-    injectFailure(type);
-    let msg = '';
-    if (type === 'SPIKE_TRAFFIC_300') msg = 'Injected +300% sudden traffic spike!';
-    if (type === 'DROP_TRAFFIC_80') msg = 'Injected -80% sudden traffic collapse!';
-    if (type === 'KILL_RANDOM_INSTANCE') msg = 'Injected instance failure: Node terminated abruptly!';
-    if (type === 'LATENCY_DEGRADATION') msg = 'Injected network degradation: Latency surge triggered!';
-    setAnomalyNotice(msg);
+  const handleAnomaly = (type: FailureType) => {
+    const message = injectFailure(type);
+    setAnomalyNotice(message);
     setTimeout(() => setAnomalyNotice(null), 4000);
   };
 
@@ -267,7 +263,7 @@ export const SimulationEngineView: React.FC = () => {
               <span>Section 13 — Failure & Anomaly Injection Suite</span>
             </h2>
             <p className="text-xs text-slate-400">
-              Test self-healing orchestration and SLA violation prevention under hostile or catastrophic cloud perturbations.
+              Inject a change into the next workload record and observe the simulated scaling response. All changes stay in local demo state.
             </p>
           </div>
           <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800">
@@ -278,7 +274,7 @@ export const SimulationEngineView: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
           {/* Anomaly 1: Spike 300% */}
           <button
-            onClick={() => handleAnomaly('SPIKE_TRAFFIC_300')}
+            onClick={() => handleAnomaly('traffic_surge')}
             className="p-4 rounded-xl bg-slate-950 border border-slate-800 hover:border-rose-500/80 transition-all text-left space-y-2 group"
           >
             <div className="flex items-center justify-between">
@@ -295,7 +291,7 @@ export const SimulationEngineView: React.FC = () => {
 
           {/* Anomaly 2: Drop 80% */}
           <button
-            onClick={() => handleAnomaly('DROP_TRAFFIC_80')}
+            onClick={() => handleAnomaly('traffic_drop')}
             className="p-4 rounded-xl bg-slate-950 border border-slate-800 hover:border-cyan-500/80 transition-all text-left space-y-2 group"
           >
             <div className="flex items-center justify-between">
@@ -312,7 +308,7 @@ export const SimulationEngineView: React.FC = () => {
 
           {/* Anomaly 3: Kill Random Instance */}
           <button
-            onClick={() => handleAnomaly('KILL_RANDOM_INSTANCE')}
+            onClick={() => handleAnomaly('server_failure')}
             className="p-4 rounded-xl bg-slate-950 border border-slate-800 hover:border-amber-500/80 transition-all text-left space-y-2 group"
           >
             <div className="flex items-center justify-between">
@@ -323,13 +319,13 @@ export const SimulationEngineView: React.FC = () => {
               <Server className="w-4 h-4 text-slate-600 group-hover:text-amber-400 transition-colors" />
             </div>
             <p className="text-[11px] text-slate-400">
-              Simulates hardware failure or AWS Spot instance reclamation. Tests health check detection and auto-recovery.
+              Marks one simulated VM as failed. Resolve the incident to restore it; no AWS resource is touched.
             </p>
           </button>
 
           {/* Anomaly 4: Latency Surge */}
           <button
-            onClick={() => handleAnomaly('LATENCY_DEGRADATION')}
+            onClick={() => handleAnomaly('latency_degradation')}
             className="p-4 rounded-xl bg-slate-950 border border-slate-800 hover:border-purple-500/80 transition-all text-left space-y-2 group"
           >
             <div className="flex items-center justify-between">
@@ -340,7 +336,7 @@ export const SimulationEngineView: React.FC = () => {
               <Clock className="w-4 h-4 text-slate-600 group-hover:text-purple-400 transition-colors" />
             </div>
             <p className="text-[11px] text-slate-400">
-              Simulates database lock or packet loss causing response times to soar to 400ms+. Triggers backpressure scale-out.
+              Raises the next record's response time to at least 400 ms so latency/SLA indicators can react.
             </p>
           </button>
         </div>
