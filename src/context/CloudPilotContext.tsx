@@ -936,24 +936,24 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         desc = `CPU spike applied to record ${targetIndex + 1}: CPU increased by 45 percentage points (capped at 100%).`;
       } else if (type === 'memory_leak') {
         changed.memory_usage = Math.min(100, observed.memory_usage + 35);
-        desc = `Memory pressure applied to record ${currentIndex + 1}: memory increased by 35 percentage points (capped at 100%).`;
+        desc = `Memory pressure applied to record ${targetIndex + 1}: memory increased by 35 percentage points (capped at 100%).`;
       } else if (type === 'traffic_surge') {
         changed.requests_per_second = Math.round(observed.requests_per_second * 4);
         changed.active_users = Math.round(observed.active_users * 4);
         changed.network_usage = Math.round(observed.network_usage * 4 * 100) / 100;
         changed.cpu_usage = Math.min(100, Math.round(observed.cpu_usage * 1.8));
         changed.response_time = Math.max(observed.response_time, Math.round(observed.response_time * 1.8));
-        desc = `Traffic surge applied to record ${currentIndex + 1}: RPS, active users and network usage increased by 300%.`;
+        desc = `Traffic surge applied to record ${targetIndex + 1}: RPS, active users and network usage increased by 300%.`;
       } else if (type === 'traffic_drop') {
         changed.requests_per_second = Math.round(observed.requests_per_second * 0.2);
         changed.active_users = Math.round(observed.active_users * 0.2);
         changed.network_usage = Math.round(observed.network_usage * 0.2 * 100) / 100;
         changed.cpu_usage = Math.round(observed.cpu_usage * 0.2 * 10) / 10;
-        desc = `Traffic drop applied to record ${currentIndex + 1}: RPS, active users and network usage reduced by 80%.`;
+        desc = `Traffic drop applied to record ${targetIndex + 1}: RPS, active users and network usage reduced by 80%.`;
       } else if (type === 'latency_degradation') {
         changed.response_time = Math.max(400, observed.response_time + 380);
         changed.network_usage = Math.round(observed.network_usage * 1.5 * 100) / 100;
-        desc = `Latency degradation applied to record ${currentIndex + 1}: response time raised to at least 400 ms.`;
+        desc = `Latency degradation applied to record ${targetIndex + 1}: response time raised to at least 400 ms.`;
       }
 
       // Mutate the next row, not the already-processed playhead row, so the next simulation
