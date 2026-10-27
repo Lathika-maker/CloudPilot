@@ -288,6 +288,7 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setCurrentIndex(0);
     setVirtualInstances(createInitialVirtualInstances(4, scalingPolicy.costPerInstanceHour));
     setScalingEvents([]);
+    setActiveFailures([]);
     simulatedInstancesMap.current = {};
     lastScaleTimeMs.current = -999999;
     setIsRunning(false);
@@ -313,6 +314,7 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setCurrentIndex(0);
       setVirtualInstances(createInitialVirtualInstances(4, scalingPolicy.costPerInstanceHour));
       setScalingEvents([]);
+      setActiveFailures([]);
       simulatedInstancesMap.current = {};
       lastScaleTimeMs.current = -999999;
       setIsRunning(false);
@@ -339,6 +341,7 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setCurrentIndex(0);
     setVirtualInstances(createInitialVirtualInstances(4, scalingPolicy.costPerInstanceHour));
     setScalingEvents([]);
+    setActiveFailures([]);
     simulatedInstancesMap.current = {};
     lastScaleTimeMs.current = -999999;
     setIsRunning(false);
@@ -837,6 +840,17 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setScalingEvents([]);
     setVirtualInstances(createInitialVirtualInstances(4, scalingPolicy.costPerInstanceHour));
     lastScaleTimeMs.current = -999999;
+    // Restore injected telemetry values before clearing incident history.
+    setDataset((prev) => {
+      const restored = [...prev];
+      for (const incident of activeFailures) {
+        if (incident.originalMetric && incident.affectedIndex != null && incident.affectedIndex < restored.length) {
+          restored[incident.affectedIndex] = incident.originalMetric;
+        }
+      }
+      return restored;
+    });
+    setActiveFailures([]);
     // Resetting to the beginning invalidates any model trained on later observations.
     globalMLEngine.reset();
     setMlMetrics(null);
