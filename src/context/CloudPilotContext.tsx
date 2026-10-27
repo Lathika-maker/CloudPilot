@@ -574,7 +574,7 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
     });
 
-    const currentTimeMs = nextIndex * 60000;
+    const currentTimeMs = Date.parse(modifiedMetric.timestamp) || nextIndex * 60000;
     const currentInstancesCount = virtualInstances.filter((v) => v.status === 'RUNNING').length;
 
     // Update ML predictions periodically or on demand
@@ -582,7 +582,14 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (isModelTrained && nextIndex >= 20 && nextIndex % 5 === 0) {
       try {
         const historySlice = dataset.slice(Math.max(0, nextIndex - 25), nextIndex + 1);
-        currentPreds = globalMLEngine.predictFuture(historySlice, 10);
+        const lastTwo = historySlice.slice(-2);
+        const observedIntervalMinutes = lastTwo.length === 2
+          ? (Date.parse(lastTwo[1].timestamp) - Date.parse(lastTwo[0].timestamp)) / 60000
+          : 1;
+        const safeIntervalMinutes = Number.isFinite(observedIntervalMinutes) && observedIntervalMinutes > 0
+          ? observedIntervalMinutes
+          : 1;
+        currentPreds = globalMLEngine.predictFuture(historySlice, 10, safeIntervalMinutes);
         setFuturePredictions(currentPreds);
       } catch (e) {
         // Fallback or ignore
