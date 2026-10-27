@@ -248,7 +248,6 @@ export function normalizeMappedRows(
     'cpu_usage',
     'memory_usage',
     'requests_per_second',
-    'active_users',
   ];
   const missingFields = requiredTargets.filter((f) => !mapping[f]);
 
