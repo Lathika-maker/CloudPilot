@@ -138,8 +138,8 @@ export const DatasetManagerView: React.FC = () => {
       const medianInterval = sortedDiffs.length
         ? sortedDiffs[Math.floor(sortedDiffs.length / 2)]
         : 1;
-      if (Math.abs(medianInterval - 1) > 0.1) {
-        throw new Error(`Detected a median interval of ${medianInterval.toFixed(2)} minutes. The current simulation and cost model require one-minute records; resample the CSV to one-minute intervals before loading.`);
+      if (timeDiffs.some((minutes) => Math.abs(minutes - 1) > 0.1)) {
+        throw new Error(`Detected a median interval of ${medianInterval.toFixed(2)} minutes and/or irregular gaps. The current simulation and cost model require every row to be one minute apart; resample the CSV to one-minute intervals before loading.`);
       }
       loadUploadedData(chronological, fileName || 'Uploaded Dataset', columnMapping);
       setUploadSuccess(true);
