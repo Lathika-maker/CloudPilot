@@ -101,23 +101,23 @@ export const StrategyInfoModal: React.FC<StrategyInfoModalProps> = ({ isOpen, on
     },
     {
       id: 'predictive' as const,
-      name: 'CloudPilot Predictive AI',
-      subtitle: 'Proactive Machine Learning Orchestrator (Random Forest Regression)',
-      badge: 'Recommended',
+      name: 'Predictive Scaling (Trend Baseline)',
+      subtitle: 'Short-horizon trend heuristic used by the strategy cost comparison',
+      badge: 'Forecast-based',
       badgeColor: 'bg-cyan-950/80 text-cyan-300 border-cyan-700/60',
       icon: Sparkles,
       color: 'from-indigo-950/60 to-slate-900 border-indigo-700/50',
       accentColor: 'text-cyan-400',
       activeBorder: 'border-cyan-400 ring-2 ring-cyan-500/40',
       description:
-        'Uses a trained browser-side time-series model to forecast request demand from the selected workload.',
+        'The comparison benchmark extrapolates recent observed RPS trend. The separate ML Pipeline trains and evaluates the browser model.',
       howItWorks:
-        'Uses the model forecast to guide simulated capacity decisions. No real VM is provisioned, and real cloud boot time is not simulated.',
+        'The comparison uses only current and past rows to estimate short-horizon demand. It does not read future rows, use the trained ML model, or provision real VMs.',
       pros: [
-        'Can allocate capacity ahead when a useful forecast predicts a rise',
-        'Forecast quality can be measured on a chronological holdout set',
+        'Can allocate ahead when the recent trend indicates rising demand',
+        'Uses only observations available at the current step',
       ],
-      cons: ['Needs at least 35 ordered workload records for training', 'Does not guarantee lower cost or fewer SLA breaches'],
+      cons: ['This benchmark is a trend heuristic, not the trained ML model', 'Does not guarantee lower cost or fewer SLA breaches'],
       impact: {
         ...getImpact('predictive'),
       },
