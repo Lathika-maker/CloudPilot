@@ -149,7 +149,7 @@ export const DatasetManagerView: React.FC = () => {
             <h1 className="text-xl font-bold text-white">Dataset Management & Ingestion Hub</h1>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            Manage real production time-series traces, upload custom telemetry, or inspect Google/Alibaba trace mapping.
+            Load synthetic demo data or upload your own workload. CloudPilot does not connect to live production telemetry.
           </p>
         </div>
 
@@ -220,7 +220,7 @@ export const DatasetManagerView: React.FC = () => {
                 className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-200 hover:bg-slate-700 border border-slate-700"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span>Reload 10K Sample</span>
+                <span>Reload 600-point Sample</span>
               </button>
               <button
                 onClick={() => {
@@ -477,7 +477,7 @@ export const DatasetManagerView: React.FC = () => {
                     <li>`task_index` / `collection_id` → Aggregate to requests_per_second</li>
                   </ul>
                   <p className="pt-2 text-[11px] text-slate-500">
-                    <em>Recommended subset:</em> Filter by top 10 long-running web serving jobs over a 24-hour period (approx 10,000 - 50,000 rows).
+                    <em>Recommended subset:</em> For larger external traces, filter a documented workload window first and preserve the original source and sampling interval.
                   </p>
                 </div>
               </div>
