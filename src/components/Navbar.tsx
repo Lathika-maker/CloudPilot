@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useCloudPilot } from '../context/CloudPilotContext';
 import {
   Activity, BarChart3, Cpu, Database, DollarSign, Edit3, HelpCircle,
-  Layers, Play, Pause, Server, Sliders, Sparkles, Zap, ChevronDown, Menu, X,
+  Layers, Play, Pause, Server, Sliders, Sparkles, Zap, ChevronDown,
 } from 'lucide-react';
 
 interface NavbarProps { onOpenStrategyInfo?: () => void; }
@@ -12,42 +12,29 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenStrategyInfo }) => {
     activeTab, setActiveTab, isRunning, startSimulation, pauseSimulation,
     activeStrategy, setActiveStrategy, virtualInstances, currentMetric, activeFailures,
   } = useCloudPilot();
-  const [menuOpen, setMenuOpen] = useState(false);
   const [groupOpen, setGroupOpen] = useState(false);
 
   const groups = useMemo(() => [
-    {
-      label: 'Overview',
-      items: [
-        { id: 'home', label: 'Home', icon: Sparkles },
-        { id: 'dashboard', label: 'Dashboard', icon: Activity },
-      ],
-    },
-    {
-      label: 'Workloads',
-      items: [
-        { id: 'dataset', label: 'Datasets', icon: Database },
-        { id: 'manual', label: 'Manual input', icon: Edit3 },
-        { id: 'what-if', label: 'What-if lab', icon: Zap },
-        { id: 'simulation', label: 'Simulation', icon: Play },
-      ],
-    },
-    {
-      label: 'Operations',
-      items: [
-        { id: 'ml', label: 'ML pipeline', icon: Layers },
-        { id: 'scaling', label: 'Scaling policy', icon: Sliders },
-        { id: 'instances', label: 'VM fleet', icon: Server },
-        { id: 'cost', label: 'Cost analysis', icon: DollarSign },
-      ],
-    },
-    {
-      label: 'Reference',
-      items: [
-        { id: 'report', label: 'Architecture report', icon: BarChart3 },
-        { id: 'aws', label: 'AWS deployment guide', icon: HelpCircle },
-      ],
-    },
+    { label: 'Overview', items: [
+      { id: 'home', label: 'Home', icon: Sparkles },
+      { id: 'dashboard', label: 'Dashboard', icon: Activity },
+    ] },
+    { label: 'Workloads', items: [
+      { id: 'dataset', label: 'Datasets', icon: Database },
+      { id: 'manual', label: 'Manual input', icon: Edit3 },
+      { id: 'what-if', label: 'What-if lab', icon: Zap },
+      { id: 'simulation', label: 'Simulation', icon: Play },
+    ] },
+    { label: 'Operations', items: [
+      { id: 'ml', label: 'ML pipeline', icon: Layers },
+      { id: 'scaling', label: 'Scaling policy', icon: Sliders },
+      { id: 'instances', label: 'VM fleet', icon: Server },
+      { id: 'cost', label: 'Cost analysis', icon: DollarSign },
+    ] },
+    { label: 'Reference', items: [
+      { id: 'report', label: 'Architecture report', icon: BarChart3 },
+      { id: 'aws', label: 'AWS deployment guide', icon: HelpCircle },
+    ] },
   ], []);
   const navItems = groups.flatMap((group) => group.items);
   const selected = navItems.find((item) => item.id === activeTab) ?? navItems[0];
@@ -55,7 +42,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenStrategyInfo }) => {
 
   const navigate = (id: string) => {
     setActiveTab(id);
-    setMenuOpen(false);
     setGroupOpen(false);
   };
 
@@ -69,7 +55,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenStrategyInfo }) => {
             <span className="cp-brand-subtitle">Predictive cloud orchestration</span>
           </span>
         </button>
-
         <div className="cp-topbar-actions">
           <div className="cp-live-summary" aria-label="Current simulation summary">
             <span className="cp-status-dot" />
@@ -87,9 +72,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenStrategyInfo }) => {
           >
             {isRunning ? <Pause size={15} /> : <Play size={15} />}
             <span>{isRunning ? 'Pause' : 'Run simulation'}</span>
-          </button>
-          <button className="cp-mobile-menu" aria-label={menuOpen ? 'Close navigation' : 'Open navigation'} onClick={() => setMenuOpen(!menuOpen)}>
-            {menuOpen ? <X size={19} /> : <Menu size={19} />}
           </button>
         </div>
       </div>
@@ -132,22 +114,22 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenStrategyInfo }) => {
         </div>
       </div>
 
-      {(activeFailures.length > 0 || activeStrategy !== 'predictive') && (
-        <div className="cp-context-strip">
-          <span className={activeFailures.length > 0 ? 'cp-context-alert' : 'cp-context-neutral'}>
-            <span className="cp-status-dot" />
-            {activeFailures.length > 0 ? `${activeFailures.length} active injected incident${activeFailures.length > 1 ? 's' : ''}` : 'Simulation comparison'}
-          </span>
-          <div className="cp-strategy-switch" aria-label="Autoscaling strategy">
-            {(['fixed', 'reactive', 'predictive'] as const).map((strategy) => (
-              <button key={strategy} onClick={() => setActiveStrategy(strategy)} className={activeStrategy === strategy ? `active ${strategy}` : ''}>
-                {strategy === 'fixed' ? 'Fixed' : strategy === 'reactive' ? 'Reactive' : 'Predictive'}
-              </button>
-            ))}
-            {onOpenStrategyInfo && <button aria-label="Explain strategies" className="cp-help-button" onClick={onOpenStrategyInfo}><HelpCircle size={14}/></button>}
-          </div>
+      <div className="cp-context-strip">
+        <span className={activeFailures.length > 0 ? 'cp-context-alert' : 'cp-context-neutral'}>
+          <span className="cp-status-dot" />
+          {activeFailures.length > 0
+            ? `${activeFailures.length} active injected incident${activeFailures.length > 1 ? 's' : ''}`
+            : `Active strategy: ${activeStrategy === 'fixed' ? 'Fixed allocation' : activeStrategy === 'reactive' ? 'Reactive autoscaling' : 'Predictive autoscaling'}`}
+        </span>
+        <div className="cp-strategy-switch" aria-label="Autoscaling strategy">
+          {(['fixed', 'reactive', 'predictive'] as const).map((strategy) => (
+            <button key={strategy} onClick={() => setActiveStrategy(strategy)} className={activeStrategy === strategy ? `active ${strategy}` : ''}>
+              {strategy === 'fixed' ? 'Fixed' : strategy === 'reactive' ? 'Reactive' : 'Predictive'}
+            </button>
+          ))}
+          {onOpenStrategyInfo && <button aria-label="Explain strategies" className="cp-help-button" onClick={onOpenStrategyInfo}><HelpCircle size={14}/></button>}
         </div>
-      )}
+      </div>
     </header>
   );
 };
