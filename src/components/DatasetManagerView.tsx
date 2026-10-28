@@ -48,9 +48,9 @@ export const DatasetManagerView: React.FC = () => {
   const pageSize = 10;
 
   const targetFields = [
-    { key: 'timestamp', label: 'Timestamp / Date', required: true },
-    { key: 'requests_per_second', label: 'Primary Load Signal (RPS if available)', required: true },
-    { key: 'cpu_usage', label: 'CPU Utilization %', required: true },
+    { key: 'timestamp', label: 'Timestamp / Date (optional; row order can be used)', required: false },
+    { key: 'requests_per_second', label: 'Requests per Second (if available)', required: false },
+    { key: 'cpu_usage', label: 'CPU Utilization % (if available)', required: false },
     { key: 'memory_usage', label: 'Memory / RAM %', required: false },
     { key: 'active_users', label: 'Active Concurrent Users', required: false },
     { key: 'network_usage', label: 'Network Bandwidth (MB/s)', required: false },
@@ -334,6 +334,10 @@ export const DatasetManagerView: React.FC = () => {
                     <strong>Data provenance:</strong> These source fields are unmapped or unavailable: [{missingFieldsNotice.join(', ')}]. The simulator fills its fixed internal schema with estimates for compatibility; these are not observations from your file. For a generic load signal, calibrate instance capacity to the signal's units before interpreting autoscaling or cost results.
                   </div>
                 )}
+
+                <div className="rounded-lg border border-cyan-800/60 bg-cyan-950/20 p-3 text-xs text-cyan-200">
+                  Unmapped numeric columns are preserved as source metrics. After loading, open the ML Pipeline and choose any available numeric source column as the forecast target. CloudPilot will not convert its units to requests/second or use it for scaling unless a capacity relationship is defined.
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   {targetFields.map((field) => (
