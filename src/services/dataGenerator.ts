@@ -261,14 +261,8 @@ export function autoMapColumns(headers: string[]): Record<string, string> {
     }
   }
 
-  // Many public telemetry datasets use generic names such as "value", "metric_value",
-  // or "usage". If no request/throughput signal exists, expose one generic numeric
-  // signal as the workload proxy so the user can inspect/override the mapping.
-  if (!mapping.requests_per_second) {
-    const excluded = /time|date|timestamp|cpu|processor|memory|mem|ram|latency|response|duration|delay|instance|replica|server|node|user|session|client|network|bandwidth|disk|storage|error|status|label|class|anomaly|id/;
-    const genericIndex = lowerHeaders.findIndex((header) => !excluded.test(header));
-    if (genericIndex >= 0) mapping.requests_per_second = headers[genericIndex];
-  }
+  // Do not relabel a generic "value" column as requests/second. Generic numeric
+  // columns are preserved separately and can be selected as forecast targets.
 
   return mapping;
 }
@@ -325,6 +319,16 @@ export function normalizeMappedRows(
     const rt = readNumber('response_time', 24);
     const inst = Math.trunc(readNumber('active_instances', Math.max(1, Math.ceil(rps / 250))));
 
+    const mappedSourceColumns = new Set(Object.values(mapping).filter(Boolean));
+    const sourceMetrics: Record<string, number> = {};
+    for (const header of Object.keys(row)) {
+      if (mappedSourceColumns.has(header)) continue;
+      const raw = row[header]?.trim();
+      if (raw == null || raw === '') continue;
+      const value = Number(raw);
+      if (Number.isFinite(value)) sourceMetrics[header] = value;
+    }
+
     return {
       timestamp: validTime,
       cpu_usage: Math.min(100, Math.max(0, cpu)),
@@ -334,6 +338,7 @@ export function normalizeMappedRows(
       active_users: Math.max(0, Math.round(users)),
       response_time: Math.max(1, rt),
       active_instances: Math.max(1, inst),
+      source_metrics: sourceMetrics,
     };
   });
 
