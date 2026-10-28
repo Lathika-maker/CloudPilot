@@ -596,6 +596,7 @@ export class MLEngine {
       // Append into simulated history so multi-step recursive autoregression works
       const dummyMetric: WorkloadMetric = {
         timestamp: predTime,
+        ...(!sourceTarget ? { [targetKey]: predictedVal } : {}),
         ...(sourceTarget ? { source_metrics: { [targetKey.slice('source:'.length)]: predictedVal } } : {}),
         cpu_usage: 65,
         memory_usage: 50,
