@@ -10,12 +10,12 @@ CloudPilot AI is a cloud-computing project that explores whether workload foreca
 
 ### Workload input and simulation
 - Built-in **synthetic** workload generation, including daily traffic patterns and occasional spikes. The app starts with no active dataset; loading data is an explicit user action.
-- Browser-based CSV/JSON ingestion with quoted CSV fields, automatic semantic column detection, manual column mapping, Unix/date timestamp parsing, and support for any positive sampling cadence and irregular gaps. The included upload-test file is `public/datasets/cloudpilot_demo_workload.csv` (1,440 rows at one-minute intervals).
+- Browser-based CSV/JSON ingestion with quoted CSV fields, automatic semantic column detection, manual column mapping, Unix/date timestamp parsing, and support for any positive sampling cadence and irregular gaps. Unmapped numeric source columns are preserved by original column name and exposed as selectable forecast targets. The included upload-test file is `public/datasets/cloudpilot_demo_workload.csv` (1,440 rows at one-minute intervals).
 - Manual workload input and editable workload points.
 - A dashboard for simulated workload, VM lifecycle, scaling decisions, resource alarms, and failure-injection scenarios.
 
 ### Forecasting and autoscaling
-- The browser ML pipeline offers two implemented choices: a custom Random-Forest-style tree ensemble and an autoregressive linear baseline.
+- The browser ML pipeline offers two implemented choices: a custom Random-Forest-style tree ensemble and an autoregressive linear baseline. Users can select standard workload metrics or a preserved numeric source column as the forecast target; forecasts remain in the selected metric's original units.
 - The browser model trains only on observations at or before the simulation playhead and uses a chronological holdout split to calculate MAE, RMSE, MAPE, and R². At least 35 observed rows are required; move the playhead forward, then train. Rewinding/resetting clears trained state to avoid future-data leakage.
 - Feature scores are derived from fitted tree split gains or the baseline's normalized coefficient magnitudes.
 - The Python API has a separate scikit-learn Random Forest pipeline with cyclical, lag, and rolling features. Its checked-in training data is synthetic.
@@ -135,7 +135,7 @@ For an academic or research submission, record the dataset source and time inter
 ## Current limitations
 
 - The browser simulator and Python API maintain separate state and model artifacts.
-- Uploaded files sent to the Python API are validated and previewed, not persisted or trained automatically. Browser ingestion currently normalizes data into a fixed CloudPilot schema; missing metrics are simulator-only estimates and must not be presented as observed source telemetry. If a generic column is mapped as the primary load signal, configure instance capacity in matching units and treat scaling/cost outputs as a calibrated simulation, not provider-accurate forecasts.
+- Uploaded files sent to the Python API are validated and previewed, not persisted or trained automatically. The browser still uses a fixed compatibility schema for simulation, and missing standard metrics may be filled with simulator-only estimates; these must not be presented as observed source telemetry. Arbitrary numeric source columns can be forecast, but scaling/cost outputs remain valid only when the selected metric has a defined, calibrated relationship to instance capacity. Generic source-metric forecasts do not automatically trigger capacity recommendations.
 - The PostgreSQL schema is present, but API persistence is not connected.
 - The AWS guide does not deploy infrastructure.
 - The workload and cost models simplify provider billing, boot latency, queueing, and SLA behavior; the simulator should not be used as a production controller.
