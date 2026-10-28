@@ -197,7 +197,7 @@ export const MLModelView: React.FC = () => {
             <span className="text-2xl font-bold font-mono text-purple-400">
               {modelMetrics?.rmse != null ? modelMetrics.rmse.toFixed(2) : '—'}
             </span>
-            <span className="text-xs font-mono text-slate-500">req/s</span>
+            <span className="text-xs font-mono text-slate-500">{selectedTargetMetric === 'requests_per_second' ? 'req/s' : 'target units'}</span>
           </div>
           <span className="text-[10px] text-slate-500 mt-1 block">Penalizes large errors in selected target units</span>
         </div>
