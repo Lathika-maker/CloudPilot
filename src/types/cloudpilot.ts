@@ -7,6 +7,8 @@ export interface WorkloadMetric {
   active_users: number;
   response_time: number; // milliseconds
   active_instances: number;
+  /** Numeric source columns preserved for dataset-specific forecasting; not assumed to be standard telemetry. */
+  source_metrics?: Record<string, number>;
 }
 
 export interface DatasetMeta {
@@ -22,7 +24,8 @@ export interface DatasetMeta {
 
 export interface MLModelConfig {
   modelType: 'random_forest' | 'autoregressive';
-  targetMetric: 'requests_per_second' | 'active_users';
+  /** Standard metric key or `source:<original column name>` for an uploaded numeric signal. */
+  targetMetric: string;
   horizonMinutes: number;
   trainRatio: number;
   lags: number[];
