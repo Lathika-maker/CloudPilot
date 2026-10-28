@@ -354,7 +354,7 @@ export const MLModelView: React.FC = () => {
 
           <div className="p-3 bg-purple-950/30 rounded-lg border border-purple-800/40 text-xs text-purple-200 flex items-center justify-between">
             <span>
-              {selectedTargetMetric.startsWith('source:') ? 'This forecast is in source-column units. Scaling recommendations are disabled for this target because its relationship to instance capacity has not been calibrated. ' : ''}
+              {selectedTargetMetric.startsWith('source:') ? 'This forecast is in source-column units. Autoscaling therefore falls back to observed RPS thresholds rather than treating this metric as RPS. ' : ''}
               Forecast-guided scaling is a simulation policy. Real VM provisioning and boot-time latency are not connected or measured here.
             </span>
           </div>
