@@ -35,6 +35,20 @@ export const MLModelView: React.FC = () => {
 
   const [isTraining, setIsTraining] = useState<boolean>(false);
   const [selectedHorizon, setSelectedHorizon] = useState<number>(10);
+  const [selectedTargetMetric, setSelectedTargetMetric] = useState<string>('requests_per_second');
+  const standardTargets = [
+    { key: 'requests_per_second', label: 'Requests per second (req/s)' },
+    { key: 'active_users', label: 'Active users' },
+    { key: 'cpu_usage', label: 'CPU utilization (%)' },
+    { key: 'memory_usage', label: 'Memory utilization (%)' },
+    { key: 'network_usage', label: 'Network throughput (MB/s)' },
+    { key: 'response_time', label: 'Response time / latency (ms)' },
+    { key: 'active_instances', label: 'Active instances' },
+  ];
+  const sourceTargets = Array.from(new Set(dataset.flatMap((point) => Object.keys(point.source_metrics || {}))))
+    .map((key) => ({ key: `source:${key}`, label: `${key} (source units)` }));
+  const targetOptions = [...standardTargets, ...sourceTargets];
+  const selectedTargetLabel = targetOptions.find((option) => option.key === selectedTargetMetric)?.label || selectedTargetMetric;
   const [trainingMessage, setTrainingMessage] = useState<{ success: boolean; message: string } | null>(null);
 
   const runTraining = (model: MLAlgorithm) => {
@@ -43,7 +57,10 @@ export const MLModelView: React.FC = () => {
     // Yield to the browser so the busy state is visible before synchronous model fitting.
     setTimeout(() => {
       try {
-        const result = trainMLModel(model);
+        const result = trainMLModel({
+          modelType: model === 'Random Forest Regressor' ? 'random_forest' : 'autoregressive',
+          targetMetric: selectedTargetMetric,
+        });
         setTrainingMessage(result);
       } catch (error) {
         setTrainingMessage({
@@ -93,7 +110,17 @@ export const MLModelView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center space-x-3 gap-y-2">
+          <label className="text-xs text-slate-400 flex items-center gap-2">
+            Forecast target
+            <select
+              value={selectedTargetMetric}
+              onChange={(e) => { setSelectedTargetMetric(e.target.value); setTrainingMessage(null); }}
+              className="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-1.5 font-mono max-w-64"
+            >
+              {targetOptions.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+            </select>
+          </label>
           {/* Model Selector */}
           <select
             value={activeModelType}
@@ -158,9 +185,9 @@ export const MLModelView: React.FC = () => {
             <span className="text-2xl font-bold font-mono text-cyan-400">
               {modelMetrics?.mae != null ? modelMetrics.mae.toFixed(2) : '—'}
             </span>
-            <span className="text-xs font-mono text-slate-500">req/s</span>
+            <span className="text-xs font-mono text-slate-500">{selectedTargetMetric === 'requests_per_second' ? 'req/s' : 'target units'}</span>
           </div>
-          <span className="text-[10px] text-slate-500 mt-1 block">Average absolute error magnitude</span>
+          <span className="text-[10px] text-slate-500 mt-1 block">Average absolute error in selected target units</span>
         </div>
 
         {/* RMSE */}
@@ -172,7 +199,7 @@ export const MLModelView: React.FC = () => {
             </span>
             <span className="text-xs font-mono text-slate-500">req/s</span>
           </div>
-          <span className="text-[10px] text-slate-500 mt-1 block">Penalizes large outlier mistakes</span>
+          <span className="text-[10px] text-slate-500 mt-1 block">Penalizes large errors in selected target units</span>
         </div>
 
         {/* MAPE */}
@@ -253,7 +280,7 @@ export const MLModelView: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-800">
             <div>
               <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                Workload Forecast (RPS)
+                Workload Forecast — {selectedTargetLabel}
               </h2>
               <p className="text-[11px] text-slate-500">
                 Recursive forecast for the selected horizon. Shaded bands estimate model spread; they are not calibrated 95% confidence intervals.
@@ -316,7 +343,7 @@ export const MLModelView: React.FC = () => {
                 <Line
                   type="monotone"
                   dataKey="predicted"
-                  name="Predicted Workload (RPS)"
+                  name={`Predicted ${selectedTargetLabel}`}
                   stroke="#a855f7"
                   strokeWidth={2.5}
                   dot={{ r: 4, fill: '#c084fc' }}
@@ -327,6 +354,7 @@ export const MLModelView: React.FC = () => {
 
           <div className="p-3 bg-purple-950/30 rounded-lg border border-purple-800/40 text-xs text-purple-200 flex items-center justify-between">
             <span>
+              {selectedTargetMetric.startsWith('source:') ? 'This forecast is in source-column units. Scaling recommendations are disabled for this target because its relationship to instance capacity has not been calibrated. ' : ''}
               Forecast-guided scaling is a simulation policy. Real VM provisioning and boot-time latency are not connected or measured here.
             </span>
           </div>
