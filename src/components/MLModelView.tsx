@@ -142,19 +142,18 @@ export const MLModelView: React.FC = () => {
                 if (e.target.value === 'quantum-demo') setSelectedForecastModel('quantum-demo');
                 else {
                   setSelectedForecastModel('classical');
-                  setActiveModelType(e.target.value as MLAlgorithm);
+                  setActiveModelType('Random Forest Regressor');
                 }
               }}
               aria-label="Forecasting model"
               className="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-1.5 font-mono"
             >
               <option value="Random Forest Regressor">Random Forest Regressor (Classical)</option>
-              <option value="Autoregressive / Moving Average">Autoregressive / Moving Average (Baseline)</option>
               <option value="quantum-demo">Hybrid-Quantum QLSTM (Experimental)</option>
             </select>
             {quantumDemoMetrics && (
-              <span title="No quantum circuit is run by this frontend. Replace these demo values with versioned notebook/backend outputs after they are reproducibly generated." className="max-w-[320px] rounded-md border border-amber-700/60 bg-amber-950/30 px-2 py-1 text-[10px] leading-relaxed text-amber-200">
-                <FlaskConical className="mr-1 inline h-3 w-3" />Experimental UI mock — QML metrics are illustrative, not measured. Hardware constraints may require offline simulation; no backend is connected.
+              <span title="This app does not execute quantum circuits. Replace placeholders only after reproducible offline simulation results are available." className="max-w-[340px] rounded-md border border-amber-700/60 bg-amber-950/30 px-2 py-1 text-[10px] leading-relaxed text-amber-200">
+                <FlaskConical className="mr-1 inline h-3 w-3" />Note: QML forecasting is not executed in this frontend. These are placeholder values pending verifiable offline NISQ-era simulation outputs.
               </span>
             )}
           </div>
@@ -204,7 +203,7 @@ export const MLModelView: React.FC = () => {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {/* MAE */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm">
-          <span className="text-[11px] font-medium text-slate-400 block">Mean Absolute Error (MAE)</span>
+          <span className="text-[11px] font-medium text-slate-400 block">{quantumDemoMetrics ? 'Holdout MAE (illustrative)' : 'Mean Absolute Error (MAE)'}</span>
           <div className="mt-1 flex items-baseline justify-between">
             <span className="text-2xl font-bold font-mono text-cyan-400">
               {displayMae != null ? displayMae.toFixed(2) : '—'}
@@ -240,7 +239,7 @@ export const MLModelView: React.FC = () => {
 
         {/* R2 Score */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm">
-          <span className="text-[11px] font-medium text-slate-400 block">Coefficient of Determination (R²)</span>
+          <span className="text-[11px] font-medium text-slate-400 block">{quantumDemoMetrics ? 'Model Alignment (R²) — illustrative' : 'Coefficient of Determination (R²)'}</span>
           <div className="mt-1 flex items-baseline justify-between">
             <span className="text-2xl font-bold font-mono text-indigo-400">
               {displayR2 != null ? displayR2.toFixed(3) : '—'}
