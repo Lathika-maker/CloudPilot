@@ -616,11 +616,21 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         currentTimeMs,
         scalingPolicy
       );
-    } else {
-      // Predictive
+    } else if (globalMLEngine.getConfig().targetMetric === 'requests_per_second') {
+      // Only RPS forecasts have a defined relationship to the simulator's instance capacity.
       decision = evaluatePredictiveScaling(
         modifiedMetric,
         currentPreds,
+        currentInstancesCount,
+        lastScaleTimeMs.current,
+        currentTimeMs,
+        scalingPolicy
+      );
+    } else {
+      // Keep scaling safe when forecasting a different metric: use observed RPS thresholds,
+      // never reinterpret latency, CPU, bytes, or an arbitrary source column as RPS.
+      decision = evaluateReactiveScaling(
+        modifiedMetric,
         currentInstancesCount,
         lastScaleTimeMs.current,
         currentTimeMs,
