@@ -591,13 +591,11 @@ export class MLEngine {
         stdDev = 12 * (1 + step * 0.06);
       }
 
-      predictedVal = Math.max(10, Math.round(predictedVal));
+      predictedVal = Math.max(0, Math.round(predictedVal));
 
       // Append into simulated history so multi-step recursive autoregression works
       const dummyMetric: WorkloadMetric = {
         timestamp: predTime,
-        ...(!sourceTarget ? { [targetKey]: predictedVal } : {}),
-        ...(sourceTarget ? { source_metrics: { [targetKey.slice('source:'.length)]: predictedVal } } : {}),
         cpu_usage: 65,
         memory_usage: 50,
         network_usage: predictedVal * 0.03,
@@ -605,6 +603,8 @@ export class MLEngine {
         active_users: targetKey === 'active_users' ? predictedVal : 0,
         response_time: 25,
         active_instances: Math.max(1, Math.ceil(predictedVal / 250)),
+        ...(!sourceTarget ? { [targetKey]: predictedVal } : {}),
+        ...(sourceTarget ? { source_metrics: { [targetKey.slice('source:'.length)]: predictedVal } } : {}),
       };
       simulatedHistory.push(dummyMetric);
 
@@ -690,9 +690,9 @@ export class MLEngine {
 
     if (this.rfModel) {
       const res = this.rfModel.predictSingle(featureRow);
-      return Math.max(10, Math.round(res.mean));
+      return Math.max(0, Math.round(res.mean));
     } else if (this.arModel) {
-      return Math.max(10, Math.round(this.arModel.predictRow(featureRow)));
+      return Math.max(0, Math.round(this.arModel.predictRow(featureRow)));
     }
     return lag1;
   }
