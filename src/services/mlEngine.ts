@@ -321,10 +321,19 @@ export class MLEngine {
     'Trend Delta',
   ];
 
+  private getMetricValue(metric: WorkloadMetric, targetKey: string): number {
+    if (targetKey.startsWith('source:')) {
+      const value = metric.source_metrics?.[targetKey.slice('source:'.length)];
+      return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+    }
+    const value = (metric as unknown as Record<string, unknown>)[targetKey];
+    return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  }
+
   /**
    * Extracts engineered features from raw metric series.
    */
-  extractFeatures(data: WorkloadMetric[], targetKey: 'requests_per_second' | 'active_users'): {
+  extractFeatures(data: WorkloadMetric[], targetKey: string): {
     X: number[][];
     y: number[];
     timestamps: string[];
@@ -336,7 +345,7 @@ export class MLEngine {
 
     for (let i = 15; i < data.length; i++) {
       const item = data[i];
-      const targetVal = item[targetKey];
+      const targetVal = this.getMetricValue(item, targetKey);
       const date = new Date(item.timestamp);
 
       const hour = isNaN(date.getUTCHours()) ? 12 : date.getUTCHours();
@@ -350,15 +359,15 @@ export class MLEngine {
       const minuteCos = Math.cos((minute / 60) * 2 * Math.PI);
 
       // Lag features
-      const lag1 = data[i - 1][targetKey];
-      const lag2 = data[i - 2][targetKey];
-      const lag5 = data[i - 5][targetKey];
+      const lag1 = this.getMetricValue(data[i - 1], targetKey);
+      const lag2 = this.getMetricValue(data[i - 2], targetKey);
+      const lag5 = this.getMetricValue(data[i - 5], targetKey);
 
       // Rolling window features
-      const slice5 = data.slice(i - 5, i).map((d) => d[targetKey]);
+      const slice5 = data.slice(i - 5, i).map((d) => this.getMetricValue(d, targetKey));
       const rollingMean5 = slice5.reduce((a, b) => a + b, 0) / 5;
 
-      const slice15 = data.slice(i - 15, i).map((d) => d[targetKey]);
+      const slice15 = data.slice(i - 15, i).map((d) => this.getMetricValue(d, targetKey));
       const rollingMean15 = slice15.reduce((a, b) => a + b, 0) / 15;
 
       const variance5 = slice5.reduce((sum, v) => sum + Math.pow(v - rollingMean5, 2), 0) / 5;
@@ -520,6 +529,7 @@ export class MLEngine {
     }
 
     const targetKey = this.currentConfig.targetMetric;
+    const sourceTarget = targetKey.startsWith('source:');
     const simulatedHistory = [...recentHistory];
     const predictions: PredictionPoint[] = [];
 
@@ -539,14 +549,14 @@ export class MLEngine {
       const minuteSin = Math.sin((minute / 60) * 2 * Math.PI);
       const minuteCos = Math.cos((minute / 60) * 2 * Math.PI);
 
-      const lag1 = simulatedHistory[n - 1][targetKey];
-      const lag2 = simulatedHistory[n - 2][targetKey];
-      const lag5 = simulatedHistory[n - 5][targetKey];
+      const lag1 = this.getMetricValue(simulatedHistory[n - 1], targetKey);
+      const lag2 = this.getMetricValue(simulatedHistory[n - 2], targetKey);
+      const lag5 = this.getMetricValue(simulatedHistory[n - 5], targetKey);
 
-      const slice5 = simulatedHistory.slice(n - 5, n).map((d) => d[targetKey]);
+      const slice5 = simulatedHistory.slice(n - 5, n).map((d) => this.getMetricValue(d, targetKey));
       const rollingMean5 = slice5.reduce((a, b) => a + b, 0) / 5;
 
-      const slice15 = simulatedHistory.slice(n - 15, n).map((d) => d[targetKey]);
+      const slice15 = simulatedHistory.slice(n - 15, n).map((d) => this.getMetricValue(d, targetKey));
       const rollingMean15 = slice15.reduce((a, b) => a + b, 0) / 15;
 
       const variance5 = slice5.reduce((sum, v) => sum + Math.pow(v - rollingMean5, 2), 0) / 5;
@@ -586,11 +596,12 @@ export class MLEngine {
       // Append into simulated history so multi-step recursive autoregression works
       const dummyMetric: WorkloadMetric = {
         timestamp: predTime,
+        ...(sourceTarget ? { source_metrics: { [targetKey.slice('source:'.length)]: predictedVal } } : {}),
         cpu_usage: 65,
         memory_usage: 50,
         network_usage: predictedVal * 0.03,
-        requests_per_second: targetKey === 'requests_per_second' ? predictedVal : predictedVal * 0.28,
-        active_users: targetKey === 'active_users' ? predictedVal : Math.round(predictedVal * 3.5),
+        requests_per_second: targetKey === 'requests_per_second' ? predictedVal : 0,
+        active_users: targetKey === 'active_users' ? predictedVal : 0,
         response_time: 25,
         active_instances: Math.max(1, Math.ceil(predictedVal / 250)),
       };
@@ -600,10 +611,16 @@ export class MLEngine {
       const upperConfidence = Math.round(predictedVal + 1.96 * stdDev);
 
       // Estimate required instances from prediction (Capacity ~250 RPS at target 70% CPU)
-      const estimatedRps = targetKey === 'requests_per_second' ? predictedVal : predictedVal * 0.28;
-      const recommendedInstances = Math.max(1, Math.ceil(estimatedRps / (250 * 0.70)));
-      const cpuRequired = Math.min(99, Math.max(15, Math.round((estimatedRps / (recommendedInstances * 250)) * 70)));
-      const memoryRequired = Math.min(95, Math.max(25, Math.round(38 + (estimatedRps / 1200) * 35)));
+      // Capacity recommendations are valid only when the forecast target is requests/second.
+      // Other metrics are forecast in their source units and must not be silently converted to RPS.
+      const hasRpsCapacityModel = targetKey === 'requests_per_second';
+      const recommendedInstances = hasRpsCapacityModel ? Math.max(1, Math.ceil(predictedVal / (250 * 0.70))) : undefined;
+      const cpuRequired = hasRpsCapacityModel && recommendedInstances
+        ? Math.min(99, Math.max(15, Math.round((predictedVal / (recommendedInstances * 250)) * 70)))
+        : undefined;
+      const memoryRequired = hasRpsCapacityModel
+        ? Math.min(95, Math.max(25, Math.round(38 + (predictedVal / 1200) * 35)))
+        : undefined;
 
       predictions.push({
         timestamp: predTime,
@@ -612,7 +629,9 @@ export class MLEngine {
         upperConfidence,
         cpuRequired,
         memoryRequired,
-        recommendedInstances,
+        ...(recommendedInstances !== undefined ? { recommendedInstances } : {}),
+        ...(cpuRequired !== undefined ? { cpuRequired } : {}),
+        ...(memoryRequired !== undefined ? { memoryRequired } : {}),
       });
     }
 
@@ -621,11 +640,11 @@ export class MLEngine {
 
   predictSingle(
     historySlice: WorkloadMetric[],
-    targetKey: 'requests_per_second' | 'active_users' = 'requests_per_second'
+    targetKey: string = 'requests_per_second'
   ): number {
     if (!this.isTrained || !historySlice || historySlice.length < 15) {
       const last = historySlice && historySlice.length > 0 ? historySlice[historySlice.length - 1] : null;
-      return last ? last[targetKey] : 0;
+      return last ? this.getMetricValue(last, targetKey) : 0;
     }
     const n = historySlice.length;
     const date = new Date(historySlice[n - 1].timestamp);
@@ -638,14 +657,14 @@ export class MLEngine {
     const minuteSin = Math.sin((minute / 60) * 2 * Math.PI);
     const minuteCos = Math.cos((minute / 60) * 2 * Math.PI);
 
-    const lag1 = historySlice[n - 1][targetKey];
-    const lag2 = historySlice[n - 2][targetKey];
-    const lag5 = historySlice[n - 5][targetKey];
+    const lag1 = this.getMetricValue(historySlice[n - 1], targetKey);
+    const lag2 = this.getMetricValue(historySlice[n - 2], targetKey);
+    const lag5 = this.getMetricValue(historySlice[n - 5], targetKey);
 
-    const slice5 = historySlice.slice(n - 5, n).map((d) => d[targetKey]);
+    const slice5 = historySlice.slice(n - 5, n).map((d) => this.getMetricValue(d, targetKey));
     const rollingMean5 = slice5.reduce((a, b) => a + b, 0) / 5;
 
-    const slice15 = historySlice.slice(n - 15, n).map((d) => d[targetKey]);
+    const slice15 = historySlice.slice(n - 15, n).map((d) => this.getMetricValue(d, targetKey));
     const rollingMean15 = slice15.reduce((a, b) => a + b, 0) / 15;
 
     const variance5 = slice5.reduce((sum, v) => sum + Math.pow(v - rollingMean5, 2), 0) / 5;
