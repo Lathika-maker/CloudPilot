@@ -626,9 +626,9 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         currentTimeMs,
         scalingPolicy
       );
-    } else {
-      // Keep scaling safe when forecasting a different metric: use observed RPS thresholds,
-      // never reinterpret latency, CPU, bytes, or an arbitrary source column as RPS.
+    } else if (datasetMeta.mapped_columns?.requests_per_second || datasetMeta.mapped_columns?.cpu_usage) {
+      // Keep scaling safe when forecasting a different metric: use only mapped, observed
+      // RPS/CPU for reactive scaling; never reinterpret an arbitrary source column as RPS.
       decision = evaluateReactiveScaling(
         modifiedMetric,
         currentInstancesCount,
@@ -636,6 +636,22 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         currentTimeMs,
         scalingPolicy
       );
+      decision = {
+        ...decision,
+        triggerReason: 'Custom forecast target; scaling uses mapped observed CPU/RPS only',
+        explanation: 'The selected forecast metric is not calibrated to instance capacity. Scaling uses the dataset’s mapped CPU/RPS telemetry and reactive thresholds, not the custom forecast.',
+      };
+    } else {
+      // No compatible capacity signal was supplied. Do not scale using estimated defaults.
+      decision = {
+        action: 'MAINTAIN' as const,
+        currentInstances: currentInstancesCount,
+        recommendedInstances: currentInstancesCount,
+        triggerReason: 'No mapped CPU or requests-per-second capacity signal',
+        explanation: 'Autoscaling is held because this dataset has no mapped CPU utilization or requests-per-second signal. Map a compatible metric before interpreting scaling results.',
+        cooldownRemainingSeconds: 0,
+        strategy: 'predictive' as const,
+      };
     }
 
     // Process Scaling Decision & update Virtual Instances
