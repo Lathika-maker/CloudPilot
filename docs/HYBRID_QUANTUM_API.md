@@ -8,7 +8,11 @@
 - `backend/quantum_api/main.py`: Pydantic-validated FastAPI endpoint, explicit CORS allowlist, PennyLane quantum layer inside a PyTorch recurrent QLSTM-style cell, holdout metrics and future CPU forecasts.
 - The provider flag routes experimental selection to the API; existing classical model functions and `src/services/mlEngine.ts` remain unchanged.
 
-## Run locally
+## Run locally (one command)
+
+From the repository root, run `npm install` once, then `npm run dev:quantum`. This script prepares the Python environment and launches FastAPI plus Vite from one terminal; press Ctrl+C to stop them. The first dependency install may take several minutes.
+
+### Manual two-terminal alternative
 
 1. Terminal A: `cd backend/quantum_api && python3.11 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && uvicorn main:app --reload --host 127.0.0.1 --port 8000`.
 2. Confirm <http://127.0.0.1:8000/health> returns `"status": "ok"`.
