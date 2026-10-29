@@ -2,7 +2,19 @@
 
 This opt-in service uses PennyLane's `default.qubit` with a trainable quantum feature layer inside a PyTorch recurrent cell. The simulator runs on classical hardware; it does not access quantum hardware or claim quantum advantage.
 
-## Start locally
+## Start locally (recommended: one command)
+
+From the repository root, install the frontend dependencies once and start both services:
+
+```bash
+npm install
+npm run dev:quantum
+```
+
+The script creates `backend/quantum_api/.venv`, installs backend requirements when first needed or when they change, starts FastAPI, and then starts Vite. Leave that terminal open and press Ctrl+C to stop both. Requirements: Node.js 20+ and Python 3.11 or 3.12. The first Python dependency installation may take several minutes.
+
+### Manual two-terminal startup
+
 
 Terminal A, from the repository root:
 
