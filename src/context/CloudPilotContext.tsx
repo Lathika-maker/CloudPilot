@@ -28,6 +28,9 @@ import {
 } from '../services/scalingEngine';
 import { LoadBalancerSimulator, LoadBalancerStats } from '../services/loadBalancer';
 import { runStrategyComparison, ComparisonSummary } from '../services/costEngine';
+import { requestQuantumCpuForecast } from '../api/quantumService';
+import type { QuantumForecastMetrics } from '../api/quantumService';
+import { evaluateQuantumCpuForecastScaling } from '../services/quantumScalingAdapter';
 
 export const DEFAULT_ALERT_CONFIG: AlertThresholdConfig = {
   enabled: true,
@@ -91,6 +94,10 @@ interface CloudPilotContextType {
   setActiveModelType: (model: MLAlgorithm) => void;
   isModelTrained: boolean;
   futurePredictions: PredictionPoint[];
+  activeForecastProvider: 'classical' | 'quantum';
+  setActiveForecastProvider: (provider: 'classical' | 'quantum') => void;
+  quantumMetrics: QuantumForecastMetrics | null;
+  forecastWithQuantum: (history: WorkloadMetric[], horizonSteps?: number) => Promise<{ success: boolean; message: string }>;
   trainMLModel: (config?: Partial<MLModelConfig> | MLAlgorithm) => { success: boolean; message: string };
 
   // Failure Injection
@@ -168,6 +175,17 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [activeModelType, setActiveModelType] = useState<MLAlgorithm>('Random Forest Regressor');
   const [isModelTrained, setIsModelTrained] = useState<boolean>(false);
   const [futurePredictions, setFuturePredictions] = useState<PredictionPoint[]>([]);
+  const [activeForecastProvider, setActiveForecastProviderState] = useState<'classical' | 'quantum'>('classical');
+  const [quantumMetrics, setQuantumMetrics] = useState<QuantumForecastMetrics | null>(null);
+  const quantumRequestGeneration = useRef(0);
+
+  const setActiveForecastProvider = useCallback((provider: 'classical' | 'quantum') => {
+    quantumRequestGeneration.current += 1;
+    setActiveForecastProviderState(provider);
+    setQuantumMetrics(null);
+    setFuturePredictions([]);
+    setIsModelTrained(false);
+  }, []);
 
   // Failures & Incidents
   const [activeFailures, setActiveFailures] = useState<FailureIncident[]>([]);
@@ -296,6 +314,9 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setMlMetrics(null);
     setIsModelTrained(false);
     setFuturePredictions([]);
+    quantumRequestGeneration.current += 1;
+    setActiveForecastProviderState('classical');
+    setQuantumMetrics(null);
   }, [scalingPolicy.costPerInstanceHour]);
 
   const loadUploadedData = useCallback(
@@ -322,6 +343,9 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setMlMetrics(null);
       setIsModelTrained(false);
       setFuturePredictions([]);
+    quantumRequestGeneration.current += 1;
+    setActiveForecastProviderState('classical');
+    setQuantumMetrics(null);
     },
     [scalingPolicy.costPerInstanceHour]
   );
@@ -349,6 +373,9 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setMlMetrics(null);
     setIsModelTrained(false);
     setFuturePredictions([]);
+    quantumRequestGeneration.current += 1;
+    setActiveForecastProviderState('classical');
+    setQuantumMetrics(null);
   }, [scalingPolicy.costPerInstanceHour]);
 
   const simulatedInstancesMap = useRef<Record<number, number>>({});
@@ -423,19 +450,20 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         reason = decision.triggerReason || 'Switched to Reactive Autoscaling';
         explanation = decision.explanation || `Reactive scaling triggered based on CPU threshold rules (>75% scale up, <35% scale down). Sized to ${targetCount} instances.`;
       } else {
-        // predictive
-        const decision = evaluatePredictiveScaling(
-          metric,
-          futurePredictions,
-          currentRunning,
-          -999999,
-          currentIndex * 60000,
-          scalingPolicy
-        );
+        const decision = activeForecastProvider === 'quantum'
+          ? (futurePredictions.length > 0
+              ? evaluateQuantumCpuForecastScaling(metric, futurePredictions, currentRunning, -999999, currentIndex * 60000, scalingPolicy)
+              : {
+                  action: 'MAINTAIN' as const, currentInstances: currentRunning,
+                  recommendedInstances: currentRunning, triggerReason: 'Waiting for a valid quantum CPU forecast',
+                  explanation: 'No quantum API prediction is available, so no quantum-driven scaling action is taken.',
+                  cooldownRemainingSeconds: 0, strategy: 'predictive' as const,
+                })
+          : evaluatePredictiveScaling(metric, futurePredictions, currentRunning, -999999, currentIndex * 60000, scalingPolicy);
         targetCount = Math.max(scalingPolicy.minInstances, Math.min(scalingPolicy.maxInstances, decision.recommendedInstances));
         action = decision.action;
         reason = decision.triggerReason || 'Switched to CloudPilot Predictive AI';
-        explanation = decision.explanation || `Predictive scaling active: ML model evaluated 10-minute demand forecast and proactively allocated ${targetCount} instances.`;
+        explanation = decision.explanation || `Predictive scaling applied; target fleet is ${targetCount} instances.`;
       }
 
       // Resize virtual instances immediately
@@ -474,6 +502,9 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const clamped = Math.max(0, Math.min(dataset.length - 1, step));
     // A trained model must not survive a backward seek, because it may have seen later rows.
     if (clamped < currentIndex) {
+      quantumRequestGeneration.current += 1;
+      setActiveForecastProviderState('classical');
+      setQuantumMetrics(null);
       globalMLEngine.reset();
       setMlMetrics(null);
       setIsModelTrained(false);
@@ -579,7 +610,7 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     // Update ML predictions periodically or on demand
     let currentPreds: PredictionPoint[] = futurePredictions;
-    if (isModelTrained && nextIndex >= 20 && nextIndex % 5 === 0) {
+    if (isModelTrained && activeForecastProvider === 'classical' && nextIndex >= 20 && nextIndex % 5 === 0) {
       try {
         const historySlice = dataset.slice(Math.max(0, nextIndex - 25), nextIndex + 1);
         const lastTwo = historySlice.slice(-2);
@@ -616,6 +647,18 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         currentTimeMs,
         scalingPolicy
       );
+    } else if (activeForecastProvider === 'quantum') {
+      decision = currentPreds.length > 0
+        ? evaluateQuantumCpuForecastScaling(modifiedMetric, currentPreds, currentInstancesCount, lastScaleTimeMs.current, currentTimeMs, scalingPolicy)
+        : {
+            action: 'MAINTAIN' as const,
+            currentInstances: currentInstancesCount,
+            recommendedInstances: currentInstancesCount,
+            triggerReason: 'Waiting for a valid quantum CPU forecast',
+            explanation: 'No quantum API prediction is available; capacity is held instead of using forecasts in a different scale.',
+            cooldownRemainingSeconds: 0,
+            strategy: 'predictive' as const,
+          };
     } else if (globalMLEngine.getConfig().targetMetric === 'requests_per_second') {
       // Only RPS forecasts have a defined relationship to the simulator's instance capacity.
       decision = evaluatePredictiveScaling(
@@ -840,6 +883,7 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     virtualInstances,
     futurePredictions,
     isModelTrained,
+    activeForecastProvider,
     activeStrategy,
     scalingPolicy,
     lbAlgorithm,
@@ -889,6 +933,9 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setMlMetrics(null);
     setIsModelTrained(false);
     setFuturePredictions([]);
+    quantumRequestGeneration.current += 1;
+    setActiveForecastProviderState('classical');
+    setQuantumMetrics(null);
   };
 
   const updateScalingPolicy = (newPolicy: Partial<ScalingPolicy>) => {
@@ -896,6 +943,9 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const trainMLModel = (configOrAlgo?: Partial<MLModelConfig> | MLAlgorithm) => {
+    quantumRequestGeneration.current += 1;
+    setActiveForecastProviderState('classical');
+    setQuantumMetrics(null);
     let cfg: Partial<MLModelConfig> = {};
     if (typeof configOrAlgo === 'string') {
       setActiveModelType(configOrAlgo);
@@ -929,6 +979,39 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
     return res;
   };
+
+  const forecastWithQuantum = useCallback(async (history: WorkloadMetric[], horizonSteps = 10): Promise<{ success: boolean; message: string }> => {
+    if (history.length < 24) return { success: false, message: 'Quantum forecasting requires at least 24 observed CPU records.' };
+    if (datasetMeta.source === 'uploaded' && !datasetMeta.mapped_columns?.cpu_usage) {
+      return { success: false, message: 'Map a real CPU-utilization column before using the quantum API.' };
+    }
+    const requestId = ++quantumRequestGeneration.current;
+    setActiveForecastProviderState('quantum');
+    setQuantumMetrics(null);
+    setFuturePredictions([]);
+    try {
+      const result = await requestQuantumCpuForecast(history, horizonSteps);
+      if (requestId !== quantumRequestGeneration.current) {
+        return { success: false, message: 'The dataset or model selection changed while the request was running. Please retry.' };
+      }
+      setQuantumMetrics(result.metrics);
+      setFuturePredictions(result.predictions.map((point) => ({
+        timestamp: point.timestamp, predicted: point.cpu_utilization,
+        lowerConfidence: point.lower_confidence, upperConfidence: point.upper_confidence,
+      })));
+      setIsModelTrained(false);
+      return {
+        success: true,
+        message: `${result.model}: ${result.predictions.length} CPU forecasts; holdout MAE ${result.metrics.mae.toFixed(2)} percentage points, RMSE ${result.metrics.rmse.toFixed(2)}, R² ${result.metrics.r2.toFixed(3)}. ${result.note}`,
+      };
+    } catch (error) {
+      if (requestId === quantumRequestGeneration.current) {
+        setQuantumMetrics(null);
+        setFuturePredictions([]);
+      }
+      return { success: false, message: error instanceof Error ? error.message : 'Quantum API request failed. Check that FastAPI is running.' };
+    }
+  }, [datasetMeta.source, datasetMeta.mapped_columns]);
 
   const injectFailure = (type: FailureType): string => {
     let desc = '';
@@ -1100,6 +1183,10 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setActiveModelType,
         isModelTrained,
         futurePredictions,
+        activeForecastProvider,
+        setActiveForecastProvider,
+        quantumMetrics,
+        forecastWithQuantum,
         trainMLModel,
         activeFailures,
         injectFailure,
