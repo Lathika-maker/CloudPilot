@@ -494,7 +494,7 @@ export const CloudPilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setScalingEvents((prev) => [event, ...prev].slice(0, 100));
 
     },
-    [dataset, currentIndex, virtualInstances, scalingPolicy, futurePredictions, resizeInstancesList]
+    [dataset, currentIndex, virtualInstances, scalingPolicy, futurePredictions, activeForecastProvider, resizeInstancesList]
   );
 
   const jumpToStep = useCallback((step: number) => {
