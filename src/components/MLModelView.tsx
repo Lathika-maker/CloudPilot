@@ -32,11 +32,14 @@ export const MLModelView: React.FC = () => {
     currentIndex,
     jumpToStep,
     setActiveTab,
+    activeForecastProvider,
+    setActiveForecastProvider,
+    forecastWithQuantum,
+    quantumMetrics,
   } = useCloudPilot();
 
   const [isTraining, setIsTraining] = useState<boolean>(false);
   const [selectedHorizon, setSelectedHorizon] = useState<number>(10);
-  const [selectedForecastModel, setSelectedForecastModel] = useState<'classical' | 'quantum-demo'>('classical');
   const [selectedTargetMetric, setSelectedTargetMetric] = useState<string>('requests_per_second');
   const standardTargets = [
     { key: 'requests_per_second', label: 'Requests per second (req/s)' },
@@ -75,20 +78,30 @@ export const MLModelView: React.FC = () => {
     }, 50);
   };
 
-  const handleRetrain = () => {
-    if (selectedForecastModel === 'quantum-demo') {
-      setTrainingMessage({ success: true, message: 'Experimental UI mode selected. No quantum circuit or backend was executed; the figures below are illustrative demo values.' });
+  const handleRetrain = async () => {
+    if (activeForecastProvider === 'quantum') {
+      setIsTraining(true);
+      setTrainingMessage(null);
+      try {
+        const observedHistory = dataset.slice(0, currentIndex + 1).slice(-120);
+        setTrainingMessage(await forecastWithQuantum(observedHistory, selectedHorizon));
+      } catch (error) {
+        setTrainingMessage({ success: false, message: error instanceof Error ? error.message : 'Quantum forecast request failed.' });
+      } finally {
+        setIsTraining(false);
+      }
       return;
     }
     runTraining(activeModelType);
   };
-
-  const quantumDemoMetrics = selectedForecastModel === 'quantum-demo';
-  const displayMae = quantumDemoMetrics ? 0.84 : modelMetrics?.mae;
-  const displayR2 = quantumDemoMetrics ? 0.912 : modelMetrics?.r2;
+  const quantumModelSelected = activeForecastProvider === 'quantum';
+  const displayMae = quantumModelSelected ? quantumMetrics?.mae : modelMetrics?.mae;
+  const displayRmse = quantumModelSelected ? quantumMetrics?.rmse : modelMetrics?.rmse;
+  const displayMape = quantumModelSelected ? quantumMetrics?.mape : modelMetrics?.mape;
+  const displayR2 = quantumModelSelected ? quantumMetrics?.r2 : modelMetrics?.r2;
 
   // Convert feature importance to chart data
-  const featureImportanceObj = modelMetrics?.feature_importance || {};
+  const featureImportanceObj = quantumModelSelected ? {} : (modelMetrics?.feature_importance || {});
   const featureChartData = Object.entries(featureImportanceObj)
     .map(([feature, weight]) => ({
       feature: feature.replace(/_/g, ' '),
@@ -118,7 +131,7 @@ export const MLModelView: React.FC = () => {
             <h1 className="text-xl font-bold text-white">Machine Learning Pipeline & Time-Series Engine</h1>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            Browser-side forecasting with chronological holdout evaluation on the selected workload.
+            Classical browser forecasting plus an opt-in FastAPI/PennyLane CPU forecasting service.
           </p>
         </div>
 
@@ -133,27 +146,32 @@ export const MLModelView: React.FC = () => {
               {targetOptions.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
             </select>
           </label>
-          {/* Forecast model selector: quantum option is a UI-only experimental mock. */}
+          {/* Provider selection leaves the original classical models on the browser engine. */}
           <div className="flex flex-col gap-1">
             <select
-              value={selectedForecastModel === 'quantum-demo' ? 'quantum-demo' : activeModelType}
+              value={activeForecastProvider === 'quantum' ? 'quantum' : activeModelType}
               onChange={(e) => {
                 setTrainingMessage(null);
-                if (e.target.value === 'quantum-demo') setSelectedForecastModel('quantum-demo');
-                else {
-                  setSelectedForecastModel('classical');
-                  setActiveModelType('Random Forest Regressor');
+                if (e.target.value === 'quantum') {
+                  setActiveForecastProvider('quantum');
+                  setSelectedTargetMetric('cpu_usage');
+                } else {
+                  setActiveForecastProvider('classical');
+                  setActiveModelType(e.target.value as MLAlgorithm);
                 }
               }}
               aria-label="Forecasting model"
               className="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-1.5 font-mono"
             >
               <option value="Random Forest Regressor">Random Forest Regressor (Classical)</option>
-              <option value="quantum-demo">Hybrid-Quantum QLSTM (Experimental)</option>
+              <option value="Autoregressive / Moving Average">Autoregressive / Moving Average (Baseline)</option>
+              <option value="quantum">Hybrid-Quantum QLSTM (Experimental API)</option>
             </select>
-            {quantumDemoMetrics && (
-              <span title="This app does not execute quantum circuits. Replace placeholders only after reproducible offline simulation results are available." className="max-w-[340px] rounded-md border border-amber-700/60 bg-amber-950/30 px-2 py-1 text-[10px] leading-relaxed text-amber-200">
-                <FlaskConical className="mr-1 inline h-3 w-3" />Note: QML forecasting is not executed in this frontend. These are placeholder values pending verifiable offline NISQ-era simulation outputs.
+            {quantumModelSelected && (
+              <span title="Requires the local FastAPI quantum simulator; quantum circuits run in the backend, not the browser."
+                className="max-w-[360px] rounded-md border border-purple-700/60 bg-purple-950/30 px-2 py-1 text-[10px] leading-relaxed text-purple-200">
+                <FlaskConical className="mr-1 inline h-3 w-3" />
+                Experimental PennyLane/PyTorch QLSTM simulation. Metrics are computed from the observed CPU history.
               </span>
             )}
           </div>
@@ -164,7 +182,7 @@ export const MLModelView: React.FC = () => {
             className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-purple-600 text-white hover:bg-purple-500 shadow-md shadow-purple-950/50 disabled:opacity-50"
           >
             <RotateCw className={`w-3.5 h-3.5 ${isTraining ? 'animate-spin' : ''}`} />
-            <span>{isTraining ? 'Training...' : 'Retrain Model'}</span>
+            <span>{isTraining ? (quantumModelSelected ? 'Running QLSTM...' : 'Training...') : (quantumModelSelected ? 'Run QLSTM Forecast' : 'Retrain Model')}</span>
           </button>
         </div>
       </div>
@@ -203,14 +221,14 @@ export const MLModelView: React.FC = () => {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {/* MAE */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm">
-          <span className="text-[11px] font-medium text-slate-400 block">{quantumDemoMetrics ? 'Holdout MAE (illustrative)' : 'Mean Absolute Error (MAE)'}</span>
+          <span className="text-[11px] font-medium text-slate-400 block">{quantumModelSelected ? 'Holdout MAE' : 'Mean Absolute Error (MAE)'}</span>
           <div className="mt-1 flex items-baseline justify-between">
             <span className="text-2xl font-bold font-mono text-cyan-400">
               {displayMae != null ? displayMae.toFixed(2) : '—'}
             </span>
-            <span className="text-xs font-mono text-slate-500">{selectedTargetMetric === 'requests_per_second' ? 'req/s' : 'target units'}</span>
+            <span className="text-xs font-mono text-slate-500">{quantumModelSelected ? 'CPU % points' : (selectedTargetMetric === 'requests_per_second' ? 'req/s' : 'target units')}</span>
           </div>
-          <span className="text-[10px] text-slate-500 mt-1 block">{quantumDemoMetrics ? 'Illustrative demo value — not evaluated on holdout data' : 'Average absolute error in selected target units'}</span>
+          <span className="text-[10px] text-slate-500 mt-1 block">{quantumModelSelected ? 'Chronological holdout MAE in CPU percentage points' : 'Average absolute error in selected target units'}</span>
         </div>
 
         {/* RMSE */}
@@ -218,9 +236,9 @@ export const MLModelView: React.FC = () => {
           <span className="text-[11px] font-medium text-slate-400 block">Root Mean Squared Error (RMSE)</span>
           <div className="mt-1 flex items-baseline justify-between">
             <span className="text-2xl font-bold font-mono text-purple-400">
-              {modelMetrics?.rmse != null ? modelMetrics.rmse.toFixed(2) : '—'}
+              {displayRmse != null ? displayRmse.toFixed(2) : '—'}
             </span>
-            <span className="text-xs font-mono text-slate-500">{selectedTargetMetric === 'requests_per_second' ? 'req/s' : 'target units'}</span>
+            <span className="text-xs font-mono text-slate-500">{quantumModelSelected ? 'CPU % points' : (selectedTargetMetric === 'requests_per_second' ? 'req/s' : 'target units')}</span>
           </div>
           <span className="text-[10px] text-slate-500 mt-1 block">Penalizes large errors in selected target units</span>
         </div>
@@ -230,23 +248,23 @@ export const MLModelView: React.FC = () => {
           <span className="text-[11px] font-medium text-slate-400 block">Mean Absolute Percentage Error (MAPE)</span>
           <div className="mt-1 flex items-baseline justify-between">
             <span className="text-2xl font-bold font-mono text-emerald-400">
-              {modelMetrics?.mape != null ? `${modelMetrics.mape.toFixed(1)}%` : '—'}
+              {displayMape != null ? `${displayMape.toFixed(1)}%` : '—'}
             </span>
-            <span className="text-xs font-mono text-slate-500">{modelMetrics?.mape != null ? "Measured" : "Not evaluated"}</span>
+            <span className="text-xs font-mono text-slate-500">{displayMape != null ? (quantumModelSelected ? "API holdout" : "Measured") : "Not evaluated"}</span>
           </div>
           <span className="text-[10px] text-slate-500 mt-1 block">Mean Absolute Percentage Error</span>
         </div>
 
         {/* R2 Score */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm">
-          <span className="text-[11px] font-medium text-slate-400 block">{quantumDemoMetrics ? 'Model Alignment (R²) — illustrative' : 'Coefficient of Determination (R²)'}</span>
+          <span className="text-[11px] font-medium text-slate-400 block">{quantumModelSelected ? 'Model Alignment (R²)' : 'Coefficient of Determination (R²)'}</span>
           <div className="mt-1 flex items-baseline justify-between">
             <span className="text-2xl font-bold font-mono text-indigo-400">
               {displayR2 != null ? displayR2.toFixed(3) : '—'}
             </span>
             <span className="text-xs font-mono text-slate-500">Max 1.0</span>
           </div>
-          <span className="text-[10px] text-slate-500 mt-1 block">{quantumDemoMetrics ? 'Illustrative demo value — not evaluated on holdout data' : 'Explained variance proportion'}</span>
+          <span className="text-[10px] text-slate-500 mt-1 block">{quantumModelSelected ? 'Chronological holdout R² from the API model' : 'Explained variance proportion'}</span>
         </div>
       </div>
 
@@ -260,7 +278,7 @@ export const MLModelView: React.FC = () => {
                 Feature Scores (normalized)
               </h2>
               <p className="text-[11px] text-slate-500">
-                {quantumDemoMetrics ? 'Classical feature scores are retained for layout only; they are not QLSTM feature importance.' : 'Tree split gains or normalized absolute baseline coefficients; scores are derived from the fitted model.'}
+                {quantumModelSelected ? 'The quantum recurrent model does not expose the browser tree-engine feature-importance scores.' : 'Tree split gains or normalized absolute baseline coefficients; scores are derived from the fitted model.'}
               </p>
             </div>
             <Sparkles className="w-4 h-4 text-purple-400" />
@@ -269,7 +287,7 @@ export const MLModelView: React.FC = () => {
           <div className="h-64 w-full relative">
             {featureChartData.length === 0 && (
               <div className="absolute inset-0 z-10 grid place-items-center rounded-lg border border-dashed border-slate-800 bg-slate-950/40 px-6 text-center text-xs leading-relaxed text-slate-500">
-                Feature scores appear after a successful training run on the observed history.
+                {quantumModelSelected ? 'Feature importance is not produced by the quantum recurrent model.' : 'Feature scores appear after a successful training run on the observed history.'}
               </div>
             )}
             <ResponsiveContainer width="100%" height="100%">
@@ -292,9 +310,9 @@ export const MLModelView: React.FC = () => {
           </div>
 
           <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 text-xs text-slate-400 space-y-1 font-mono text-[11px]">
-            <p><strong>Observed History Points:</strong> {modelMetrics?.sample_size != null ? Number(modelMetrics.sample_size).toLocaleString() : '—'} records</p>
+            <p><strong>Observed History Points:</strong> {quantumModelSelected ? (quantumMetrics?.observations_used ?? '—') : (modelMetrics?.sample_size != null ? Number(modelMetrics.sample_size).toLocaleString() : '—')} records</p>
             <p><strong>Split Strategy:</strong> Chronological 80/20 (No future leakage)</p>
-            <p><strong>Last Trained:</strong> {modelMetrics?.trained_at || modelMetrics?.trainedAt ? new Date(modelMetrics.trained_at || modelMetrics.trainedAt).toLocaleTimeString() : 'Not trained'}</p>
+            <p><strong>Last Trained:</strong> {quantumModelSelected ? (quantumMetrics?.generated_at ? new Date(quantumMetrics.generated_at).toLocaleTimeString() : 'API not run') : (modelMetrics?.trained_at || modelMetrics?.trainedAt ? new Date(modelMetrics.trained_at || modelMetrics.trainedAt).toLocaleTimeString() : 'Not trained')}</p>
           </div>
         </div>
 
@@ -329,9 +347,9 @@ export const MLModelView: React.FC = () => {
           </div>
 
           <div className="h-64 w-full relative">
-            {(quantumDemoMetrics || predictionPoints.length === 0) && (
+            {predictionPoints.length === 0 && (
               <div className="absolute inset-0 z-10 grid place-items-center rounded-lg border border-dashed border-slate-800 bg-slate-950/40 px-6 text-center text-xs leading-relaxed text-slate-500">
-                {quantumDemoMetrics ? 'No quantum prediction series is connected. The forecast chart is intentionally not presented as QLSTM output.' : 'Train the model after selecting at least 35 observed records. Forecasts use only data at or before the current playhead.'}
+                {quantumModelSelected ? 'Run the API forecast after selecting at least 35 observed records. Returned CPU predictions appear here.' : 'Train the model after selecting at least 35 observed records. Forecasts use only data at or before the current playhead.'}
               </div>
             )}
             <ResponsiveContainer width="100%" height="100%">
@@ -377,7 +395,7 @@ export const MLModelView: React.FC = () => {
 
           <div className="p-3 bg-purple-950/30 rounded-lg border border-purple-800/40 text-xs text-purple-200 flex items-center justify-between">
             <span>
-              {quantumDemoMetrics ? 'Experimental selection is display-only: the classical model remains the only executable forecasting path, and the demo metrics do not drive autoscaling. ' : ''}
+              {quantumModelSelected ? 'CPU forecasts come from FastAPI/PennyLane and can drive the simulator through its CPU-specific capacity adapter. ' : ''}
               {selectedTargetMetric.startsWith('source:') ? 'This forecast is in source-column units. Autoscaling therefore falls back to observed RPS thresholds rather than treating this metric as RPS. ' : ''}
               Forecast-guided scaling is a simulation policy. Real VM provisioning and boot-time latency are not connected or measured here.
             </span>
