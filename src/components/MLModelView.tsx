@@ -183,6 +183,7 @@ export const MLModelView: React.FC = () => {
           </div>
 
           <button
+            type="button"
             onClick={handleRetrain}
             disabled={isTraining || currentIndex + 1 < 35}
             className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-purple-600 text-white hover:bg-purple-500 shadow-md shadow-purple-950/50 disabled:opacity-50"
@@ -215,7 +216,15 @@ export const MLModelView: React.FC = () => {
         </div>
         {currentIndex + 1 < 35 && dataset.length >= 35 && (
           <button
-            onClick={() => { jumpToStep(34); setTrainingMessage({ success: true, message: 'Playhead moved to record 35. This selects the first 35 records as observed history; it does not replay the skipped scaling events.' }); }}
+            type="button"
+            onClick={() => {
+              setQuantumRequestNotice(null);
+              jumpToStep(34);
+              setTrainingMessage({
+                success: true,
+                message: 'History selected: records 1–35 are now observed. The QLSTM forecast button should now be enabled.',
+              });
+            }}
             className="shrink-0 rounded-lg border border-indigo-500/40 bg-indigo-600/15 px-3 py-2 text-xs font-semibold text-indigo-200 hover:bg-indigo-600/25"
           >
             Use first 35 records as history
