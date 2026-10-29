@@ -51,6 +51,21 @@ npm run lint
 npm run build
 ```
 
+### Full local development (including Hybrid-Quantum QLSTM)
+
+Requirements: Node.js 20+ and Python 3.11 or 3.12.
+
+After cloning or pulling the repository, run these commands from the repository root:
+
+```bash
+npm install
+npm run dev:quantum
+```
+
+The first run creates the backend virtual environment and installs PennyLane/PyTorch dependencies; that one-time install can take several minutes. Later runs reuse the environment and only reinstall if `backend/quantum_api/requirements.txt` changes. The command starts FastAPI and Vite together. Open <http://localhost:3000>, leave the terminal running, and press Ctrl+C to stop both services started by this command.
+
+The command reuses a healthy FastAPI service already running on port 8000. To select a particular Python executable, set `QUANTUM_PYTHON` (for example, `QUANTUM_PYTHON=python3.12 npm run dev:quantum`).
+
 ### Python API
 Requirements: Python 3.11 is recommended.
 
