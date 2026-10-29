@@ -69,7 +69,7 @@ export async function requestQuantumCpuForecast(
   };
 
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 120_000);
+  const timeoutId = window.setTimeout(() => controller.abort(), 300_000);
   try {
     const response = await fetch(`${API_BASE_URL}/api/v1/forecast/cpu`, {
       method: 'POST',
@@ -120,7 +120,7 @@ export async function requestQuantumCpuForecast(
     return result as QuantumForecastResult;
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Quantum API request timed out after 120 seconds.');
+      throw new Error('Quantum API request timed out after 300 seconds.');
     }
     if (error instanceof TypeError) {
       throw new Error('Cannot reach the quantum API. Start FastAPI on 127.0.0.1:8000 and verify VITE_QUANTUM_API_URL.');
