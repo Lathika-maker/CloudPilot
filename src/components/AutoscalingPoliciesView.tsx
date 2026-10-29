@@ -152,7 +152,7 @@ export const AutoscalingPoliciesView: React.FC = () => {
                 )}
               </div>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Uses Random Forest ML predictions 10 minutes ahead. Proactively provisions instances {form.leadTimeMinutes} minutes prior to surge arrival.
+                When a model has been trained and forecast points are available, uses them to inform simulated capacity decisions. No real cloud instances are provisioned.
               </p>
             </div>
             <div className="mt-4 pt-3 border-t border-slate-800 text-[11px] text-cyan-400/80 space-y-1">

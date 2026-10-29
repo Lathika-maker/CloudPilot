@@ -50,7 +50,7 @@ export const ManualWorkloadView: React.FC = () => {
     peakUsers: 8000,
     spikeProbability: 0.1,
     durationMinutes: 120,
-    intervalMinutes: 5,
+    intervalMinutes: 1,
   });
 
   const [notification, setNotification] = useState<string | null>(null);
@@ -158,6 +158,14 @@ export const ManualWorkloadView: React.FC = () => {
       };
     });
 
+    const intervals = metrics.slice(1).map((metric, index) =>
+      (Date.parse(metric.timestamp) - Date.parse(metrics[index].timestamp)) / 60000
+    );
+    if (intervals.some((minutes) => Math.abs(minutes - 1) > 0.1)) {
+      alert('Manual workload rows must be in chronological order at one-minute intervals. Update the Time column before importing.');
+      return;
+    }
+
     loadManualData(metrics);
     setNotification(`Successfully imported ${metrics.length} manually created time points into active simulation!`);
     setTimeout(() => {
@@ -168,6 +176,10 @@ export const ManualWorkloadView: React.FC = () => {
 
   // Generate Synthetic Future Workload
   const handleGenerateSynthetic = () => {
+    if (synthParams.intervalMinutes !== 1) {
+      setNotification('The current simulator requires a one-minute interval. Set Interval to 1 minute and try again.');
+      return;
+    }
     const generated = generateSyntheticWorkload(synthParams);
     loadManualData(generated);
     setNotification(
@@ -189,7 +201,7 @@ export const ManualWorkloadView: React.FC = () => {
             <h1 className="text-xl font-bold text-white">Manual Workload Input & Synthetic Generator</h1>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            Directly input workload parameters, construct multi-interval scenario tables, or generate synthetic test workloads for viva demonstrations.
+            Enter workload rows or generate a synthetic scenario. The current simulator expects chronological one-minute intervals.
           </p>
         </div>
         {notification && (
@@ -532,13 +544,15 @@ export const ManualWorkloadView: React.FC = () => {
             />
           </div>
           <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-700/70">
-            <label className="text-[11px] text-slate-400 block font-medium">Interval (minutes)</label>
+            <label className="text-[11px] text-slate-400 block font-medium">Interval (fixed by simulator)</label>
             <input
               type="number"
-              value={synthParams.intervalMinutes}
-              onChange={(e) => setSynthParams({ ...synthParams, intervalMinutes: Number(e.target.value) || 5 })}
-              className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-sm text-white font-mono"
+              value={1}
+              disabled
+              aria-label="Simulator interval fixed at one minute"
+              className="w-full mt-1 bg-slate-900/60 border border-slate-700 rounded px-2.5 py-1 text-sm text-slate-400 font-mono"
             />
+            <p className="mt-1 text-[10px] text-slate-500">One-minute rows are required for consistent playback and cost estimates.</p>
           </div>
         </div>
 

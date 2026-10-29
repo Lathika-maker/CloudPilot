@@ -30,8 +30,21 @@ export function runStrategyComparison(
   }
 
   const costPerHour = policy.costPerInstanceHour;
-  const costPerMinute = costPerHour / 60;
   const capacityPerVm = policy.instanceCapacityRps;
+  const sortedIntervalsHours = metrics.slice(1).map((metric, index) =>
+    (Date.parse(metric.timestamp) - Date.parse(metrics[index].timestamp)) / 3600000
+  ).filter((hours) => Number.isFinite(hours) && hours > 0).sort((a, b) => a - b);
+  const fallbackIntervalHours = sortedIntervalsHours.length
+    ? sortedIntervalsHours[Math.floor(sortedIntervalsHours.length / 2)]
+    : 1 / 60;
+  const durationsHours = metrics.map((metric, index) => {
+    if (index < metrics.length - 1) {
+      const hours = (Date.parse(metrics[index + 1].timestamp) - Date.parse(metric.timestamp)) / 3600000;
+      if (Number.isFinite(hours) && hours > 0) return hours;
+    }
+    return fallbackIntervalHours;
+  });
+  const totalObservedHours = durationsHours.reduce((sum, hours) => sum + hours, 0);
 
   // 1. Fixed Resource Allocation
   let fixedTotalCost = 0;
@@ -69,10 +82,10 @@ export function runStrategyComparison(
   const predictiveTimeseries: StrategyResult['timeseries'] = [];
 
   const cooldownMs = policy.cooldownSeconds * 1000;
-  const stepMs = 60 * 1000; // 1 minute per point
-
   metrics.forEach((m, idx) => {
-    const timeMs = idx * stepMs;
+    const parsedTime = Date.parse(m.timestamp);
+    const timeMs = Number.isFinite(parsedTime) ? parsedTime : idx * fallbackIntervalHours * 3600000;
+    const durationHours = durationsHours[idx];
     const rps = m.requests_per_second;
     const idealInstancesRequired = Math.ceil(rps / (capacityPerVm * (policy.targetCpuUtilization / 100)));
 
@@ -86,9 +99,9 @@ export function runStrategyComparison(
     fixedCpuSum += fixedCpu;
     if (fixedCpu > fixedPeakCpu) fixedPeakCpu = fixedCpu;
     fixedRtSum += fixedRt;
-    fixedTotalCost += fixedInstancesCount * costPerMinute;
+    fixedTotalCost += fixedInstancesCount * costPerHour * durationHours;
     const fixedWastage = Math.max(0, fixedInstancesCount - idealInstancesRequired);
-    fixedWastageHours += fixedWastage / 60;
+    fixedWastageHours += fixedWastage * durationHours;
 
     fixedTimeseries.push({
       timestamp: m.timestamp,
@@ -128,9 +141,9 @@ export function runStrategyComparison(
     reactiveCpuSum += finalReactiveCpu;
     if (finalReactiveCpu > reactivePeakCpu) reactivePeakCpu = finalReactiveCpu;
     reactiveRtSum += reactiveRt;
-    reactiveTotalCost += reactiveInstances * costPerMinute;
+    reactiveTotalCost += reactiveInstances * costPerHour * durationHours;
     const reactiveWastage = Math.max(0, reactiveInstances - idealInstancesRequired);
-    reactiveWastageHours += reactiveWastage / 60;
+    reactiveWastageHours += reactiveWastage * durationHours;
 
     reactiveTimeseries.push({
       timestamp: m.timestamp,
@@ -142,26 +155,29 @@ export function runStrategyComparison(
     });
 
     // --- PREDICTIVE ---
-    // Look ahead 5 steps in dataset (simulating ML forecast)
-    const lookAheadSteps = Math.min(5, metrics.length - 1 - idx);
-    let futureMaxRps = rps;
-    for (let k = 1; k <= lookAheadSteps; k++) {
-      if (metrics[idx + k].requests_per_second > futureMaxRps) {
-        futureMaxRps = metrics[idx + k].requests_per_second;
-      }
+    // Use only observations at or before this index. The former implementation
+    // looked ahead into future dataset rows, which leaked the answer into the policy.
+    // This cost-comparison baseline uses a simple five-step linear trend forecast;
+    // it is separate from the trained browser ML pipeline.
+    const historyStart = Math.max(0, idx - 4);
+    const observedHistory = metrics.slice(historyStart, idx + 1).map((point) => point.requests_per_second);
+    let predictedRps = rps;
+    if (observedHistory.length >= 2) {
+      const meanStepChange = (observedHistory[observedHistory.length - 1] - observedHistory[0]) / (observedHistory.length - 1);
+      predictedRps = Math.max(0, Math.round(rps + meanStepChange * 5));
     }
-
     const predictiveNeeded = Math.max(
       policy.minInstances,
-      Math.min(policy.maxInstances, Math.ceil(futureMaxRps / (capacityPerVm * (policy.targetCpuUtilization / 100))))
+      Math.min(policy.maxInstances, Math.ceil(predictedRps / (capacityPerVm * (policy.targetCpuUtilization / 100))))
     );
+    const predictiveCurrentCpu = Math.min(100, Math.round((rps / Math.max(1, predictiveInstances * capacityPerVm)) * 100 * 10) / 10);
 
     if (timeMs - predictiveLastScale >= cooldownMs) {
       if (predictiveNeeded > predictiveInstances) {
         predictiveInstances = predictiveNeeded;
         predictiveScaleUp++;
         predictiveLastScale = timeMs;
-      } else if (predictiveNeeded < predictiveInstances && finalReactiveCpu < policy.cpuLowerThreshold) {
+      } else if (predictiveNeeded < predictiveInstances && predictiveCurrentCpu < policy.cpuLowerThreshold) {
         predictiveInstances = Math.max(policy.minInstances, predictiveInstances - 1);
         predictiveScaleDown++;
         predictiveLastScale = timeMs;
@@ -177,9 +193,9 @@ export function runStrategyComparison(
     predictiveCpuSum += finalPredCpu;
     if (finalPredCpu > predictivePeakCpu) predictivePeakCpu = finalPredCpu;
     predictiveRtSum += predRt;
-    predictiveTotalCost += predictiveInstances * costPerMinute;
+    predictiveTotalCost += predictiveInstances * costPerHour * durationHours;
     const predWastage = Math.max(0, predictiveInstances - idealInstancesRequired);
-    predictiveWastageHours += predWastage / 60;
+    predictiveWastageHours += predWastage * durationHours;
 
     predictiveTimeseries.push({
       timestamp: m.timestamp,
@@ -203,7 +219,7 @@ export function runStrategyComparison(
     slaViolationRate: Math.round((fixedSlaViolations / n) * 100 * 10) / 10,
     scaleUpEvents: 0,
     scaleDownEvents: 0,
-    totalInstanceHours: Math.round((fixedInstancesCount * n / 60) * 10) / 10,
+    totalInstanceHours: Math.round((fixedInstancesCount * totalObservedHours) * 10) / 10,
     totalCost: Math.round(fixedTotalCost * 100) / 100,
     costSavingsPercent: 0,
     resourceWastageHours: Math.round(fixedWastageHours * 10) / 10,
@@ -229,7 +245,7 @@ export function runStrategyComparison(
 
   const predictiveResult: StrategyResult = {
     strategy: 'predictive',
-    name: 'CloudPilot Predictive',
+    name: 'Predictive Trend Baseline',
     avgCpu: Math.round((predictiveCpuSum / n) * 10) / 10,
     peakCpu: Math.round(predictivePeakCpu * 10) / 10,
     avgResponseTime: Math.round((predictiveRtSum / n) * 10) / 10,

@@ -7,6 +7,8 @@ export interface WorkloadMetric {
   active_users: number;
   response_time: number; // milliseconds
   active_instances: number;
+  /** Numeric source columns preserved for dataset-specific forecasting; not assumed to be standard telemetry. */
+  source_metrics?: Record<string, number>;
 }
 
 export interface DatasetMeta {
@@ -21,8 +23,9 @@ export interface DatasetMeta {
 }
 
 export interface MLModelConfig {
-  modelType: 'random_forest' | 'autoregressive' | 'lstm_sim';
-  targetMetric: 'requests_per_second' | 'active_users';
+  modelType: 'random_forest' | 'autoregressive';
+  /** Standard metric key or `source:<original column name>` for an uploaded numeric signal. */
+  targetMetric: string;
   horizonMinutes: number;
   trainRatio: number;
   lags: number[];
@@ -32,9 +35,7 @@ export type AutoscalingStrategy = 'fixed' | 'reactive' | 'predictive';
 
 export type MLAlgorithm =
   | 'Random Forest Regressor'
-  | 'Autoregressive / Moving Average'
-  | 'Gradient Boosting / XGBoost'
-  | 'LSTM Neural Network';
+  | 'Autoregressive / Moving Average';
 
 export interface MLMetrics {
   mae: number;
@@ -157,6 +158,7 @@ export type FailureType =
   | 'memory_leak'
   | 'traffic_surge'
   | 'traffic_drop'
+  | 'latency_degradation'
   | 'server_failure';
 
 export interface FailureIncident {
@@ -166,6 +168,8 @@ export interface FailureIncident {
   timestamp: string;
   resolved: boolean;
   affectedInstanceId?: string;
+  affectedIndex?: number;
+  originalMetric?: WorkloadMetric;
 }
 
 export interface ManualTimePoint {

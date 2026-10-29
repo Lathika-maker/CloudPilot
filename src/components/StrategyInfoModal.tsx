@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   X,
   Sliders,
@@ -15,6 +15,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useCloudPilot } from '../context/CloudPilotContext';
+import { runStrategyComparison } from '../services/costEngine';
 
 interface StrategyInfoModalProps {
   isOpen: boolean;
@@ -22,12 +23,34 @@ interface StrategyInfoModalProps {
 }
 
 export const StrategyInfoModal: React.FC<StrategyInfoModalProps> = ({ isOpen, onClose }) => {
-  const { activeStrategy, setActiveStrategy, virtualInstances, currentMetric, scalingPolicy } = useCloudPilot();
+  const { activeStrategy, setActiveStrategy, virtualInstances, currentMetric, scalingPolicy, dataset } = useCloudPilot();
+  const comparison = useMemo(() => isOpen && dataset.length > 0 ? runStrategyComparison(dataset, scalingPolicy) : null, [isOpen, dataset, scalingPolicy]);
 
   if (!isOpen) return null;
 
   const runningVms = virtualInstances.filter((v) => v.status === 'RUNNING').length;
   const currentCost = (runningVms * scalingPolicy.costPerInstanceHour).toFixed(2);
+  const getImpact = (strategy: 'fixed' | 'reactive' | 'predictive') => {
+    if (!comparison || dataset.length === 0) {
+      return {
+        instances: strategy === 'fixed' ? '6 VMs if simulated' : 'Workload-dependent',
+        slaCompliance: 'Not evaluated — load data',
+        avgCostPerHour: 'Not evaluated — load data',
+      };
+    }
+    const result = comparison[strategy];
+    const durationHours = Math.max(dataset.length / 60, 1 / 60);
+    const hourlyCost = result.totalCost / durationHours;
+    const averageInstances = result.totalInstanceHours / durationHours;
+    const counts = result.timeseries.map((point) => point.instances);
+    const minCount = counts.length ? Math.min(...counts) : 0;
+    const maxCount = counts.length ? Math.max(...counts) : 0;
+    return {
+      instances: strategy === 'fixed' ? '6 static VMs' : `${minCount}–${maxCount} VMs (${averageInstances.toFixed(1)} avg.)`,
+      slaCompliance: `${Math.max(0, 100 - result.slaViolationRate).toFixed(1)}% estimated`,
+      avgCostPerHour: `$${hourlyCost.toFixed(2)}/hr (~$${(hourlyCost * 24 * 30).toFixed(0)}/30 days)`,
+    };
+  };
 
   const strategies = [
     {
@@ -41,24 +64,22 @@ export const StrategyInfoModal: React.FC<StrategyInfoModalProps> = ({ isOpen, on
       accentColor: 'text-slate-300',
       activeBorder: 'border-slate-400 ring-2 ring-slate-500/40',
       description:
-        'Statically provisions a constant pool of 6 Virtual Machines (24/7) regardless of incoming workload.',
+        'Keeps a constant pool of 6 simulated Virtual Machines regardless of incoming workload.',
       howItWorks:
-        'No scaling events are ever dispatched. Instances stay frozen at 6 nodes. Does not react to traffic spikes or drops.',
-      pros: ['Predictable fixed billing ($0.60/hr)', 'Zero configuration or scaling delay'],
+        'The simulated fleet remains fixed at 6 nodes. It does not respond to changes in incoming traffic.',
+      pros: ['Predictable capacity and straightforward budgeting', 'No scaling-policy decisions are required'],
       cons: [
-        'Overpays heavily during quiet night hours (idle resource waste)',
-        'Server overload and severe SLA latency crashes during unexpected traffic surges',
+        'Can leave capacity idle during low-demand periods',
+        'Can breach configured CPU/latency thresholds during demand surges',
       ],
       impact: {
-        instances: '6 static VMs',
-        slaCompliance: '~62% (SLA breaches under surges)',
-        avgCostPerHour: '$0.60/hr ($432/mo)',
+        ...getImpact('fixed'),
       },
     },
     {
       id: 'reactive' as const,
       name: 'Reactive Autoscaling',
-      subtitle: 'Classic Threshold Scaling (AWS CloudWatch / Kubernetes HPA)',
+      subtitle: 'Threshold-based autoscaling, conceptually similar to common cloud autoscalers',
       badge: 'Industry Standard',
       badgeColor: 'bg-amber-950/80 text-amber-300 border-amber-700/60',
       icon: Zap,
@@ -66,44 +87,39 @@ export const StrategyInfoModal: React.FC<StrategyInfoModalProps> = ({ isOpen, on
       accentColor: 'text-amber-400',
       activeBorder: 'border-amber-500 ring-2 ring-amber-500/40',
       description:
-        'Monitors current CPU utilization. Scales UP when CPU > 75%, scales DOWN when CPU < 35%, with a 5-minute cooldown.',
+        'Monitors current simulated CPU utilization and applies the configured scale-up/scale-down thresholds and cooldown.',
       howItWorks:
-        'Evaluates metrics after the spike has already arrived. Because VM boot time takes 2–3 minutes, reactive lag causes temporary SLA breaches before new VMs become healthy.',
-      pros: ['Saves money during prolonged lulls compared to Fixed', 'Automated scale-down reduces overnight waste'],
+        'Makes decisions from the current observed workload, so it cannot anticipate a spike before the workload changes. Real VM boot and warm-up delays are not modelled by this simulator.',
+      pros: ['Can reduce idle capacity when demand falls', 'Responds automatically to configured thresholds'],
       cons: [
-        'Reactive delay (lag): cannot anticipate spikes',
-        'Latency spikes & 504 gateway timeouts while instances boot',
+        'Cannot anticipate demand before it is observed',
+        'Results depend on thresholds, cooldown and workload shape',
       ],
       impact: {
-        instances: 'Dynamic (2 – 12 VMs)',
-        slaCompliance: '~89% (Lag breaches during ramp-ups)',
-        avgCostPerHour: '$0.48/hr ($345/mo)',
+        ...getImpact('reactive'),
       },
     },
     {
       id: 'predictive' as const,
-      name: 'CloudPilot Predictive AI',
-      subtitle: 'Proactive Machine Learning Orchestrator (Random Forest Regression)',
-      badge: 'Recommended',
+      name: 'Predictive Scaling (Trend Baseline)',
+      subtitle: 'Short-horizon trend heuristic used by the strategy cost comparison',
+      badge: 'Forecast-based',
       badgeColor: 'bg-cyan-950/80 text-cyan-300 border-cyan-700/60',
       icon: Sparkles,
       color: 'from-indigo-950/60 to-slate-900 border-indigo-700/50',
       accentColor: 'text-cyan-400',
       activeBorder: 'border-cyan-400 ring-2 ring-cyan-500/40',
       description:
-        'Uses historical time-series ML regression to forecast traffic demand 10 minutes into the future.',
+        'The comparison benchmark extrapolates recent observed RPS trend. The separate ML Pipeline trains and evaluates the browser model.',
       howItWorks:
-        'Proactively triggers instance provisioning 2 minutes before the traffic surge hits, so servers are fully booted and warmed up exactly when needed.',
+        'The comparison uses only current and past rows to estimate short-horizon demand. It does not read future rows, use the trained ML model, or provision real VMs.',
       pros: [
-        'Eliminates VM boot lag completely',
-        '99.8% SLA compliance with zero emergency queuing',
-        'Cuts cloud infrastructure costs by 28% – 38%',
+        'Can allocate ahead when the recent trend indicates rising demand',
+        'Uses only observations available at the current step',
       ],
-      cons: ['Requires trained ML model with at least 50 historical workload points'],
+      cons: ['This benchmark is a trend heuristic, not the trained ML model', 'Does not guarantee lower cost or fewer SLA breaches'],
       impact: {
-        instances: 'Proactive (1 – 10 VMs optimal)',
-        slaCompliance: '99.8% (Zero surge lag)',
-        avgCostPerHour: '$0.34/hr ($244/mo)',
+        ...getImpact('predictive'),
       },
     },
   ];
@@ -154,20 +170,21 @@ export const StrategyInfoModal: React.FC<StrategyInfoModalProps> = ({ isOpen, on
           <div className="flex items-center space-x-4 font-mono text-slate-300">
             <div className="flex items-center space-x-1.5">
               <Server className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{runningVms} Active VMs</span>
+              <span>{dataset.length > 0 ? `${runningVms} Active VMs` : 'No active VMs'}</span>
             </div>
             <div className="flex items-center space-x-1.5">
               <Activity className="w-3.5 h-3.5 text-blue-400" />
-              <span>{currentMetric?.cpu_usage || 0}% Cluster CPU</span>
+              <span>{currentMetric ? `${currentMetric.cpu_usage.toFixed(1)}% Cluster CPU` : 'CPU —'}</span>
             </div>
             <div className="flex items-center space-x-1.5">
               <DollarSign className="w-3.5 h-3.5 text-amber-400" />
-              <span>${currentCost}/hr</span>
+              <span>{dataset.length > 0 ? `$${currentCost}/hr` : 'Cost —'}</span>
             </div>
           </div>
         </div>
 
         {/* 3 Strategy Comparison Cards */}
+        <p className="text-[11px] text-slate-500">SLA and cost values are calculated from the loaded workload using the simulator's one-minute-per-row assumption. They are estimates, not production measurements. Load a dataset to populate them.</p>
         <div className="mt-5 space-y-4 overflow-y-auto pr-1 flex-1">
           {strategies.map((strat) => {
             const Icon = strat.icon;

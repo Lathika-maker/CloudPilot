@@ -9,7 +9,7 @@ services:
     environment:
       POSTGRES_DB: cloudpilot
       POSTGRES_USER: cloudpilot_user
-      POSTGRES_PASSWORD: cloudpilot_secure_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Create a .env file and set POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
@@ -30,7 +30,7 @@ services:
     container_name: cloudpilot-backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://cloudpilot_user:cloudpilot_secure_password@postgres:5432/cloudpilot
+      DATABASE_URL: "postgresql://cloudpilot_user:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/cloudpilot"
       PYTHONUNBUFFERED: "1"
     ports:
       - "8000:8000"

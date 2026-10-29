@@ -82,7 +82,7 @@ export const VirtualInstanceMonitorView: React.FC = () => {
       healthy: true,
     };
     setVirtualInstances([...virtualInstances, newVm]);
-    showToast(`Manually provisioned virtual instance ${newId}.`);
+    showToast(`Created simulated virtual instance ${newId}.`);
   };
 
   const runningCount = virtualInstances.filter((v) => v.status === 'RUNNING').length;
@@ -99,7 +99,7 @@ export const VirtualInstanceMonitorView: React.FC = () => {
             <h1 className="text-xl font-bold text-white">Virtual Instance Monitor & Target Group</h1>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            Real-time fleet state of AWS EC2 / Container instances, lifecycle control, and health checks.
+            In-memory simulated VM fleet. Lifecycle controls change local demo state only; no AWS resources are modified.
           </p>
         </div>
 

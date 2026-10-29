@@ -58,19 +58,19 @@ export const CostAnalysisView: React.FC = () => {
       metric: 'Total Cloud Cost ($)',
       'Fixed Fleet': benchmarkResult.fixed.totalCost,
       'Reactive Autoscaling': benchmarkResult.reactive.totalCost,
-      'CloudPilot Predictive AI': benchmarkResult.predictive.totalCost,
+      'Predictive Trend Baseline': benchmarkResult.predictive.totalCost,
     },
     {
       metric: 'SLA Violations (Count)',
       'Fixed Fleet': benchmarkResult.fixed.slaViolations,
       'Reactive Autoscaling': benchmarkResult.reactive.slaViolations,
-      'CloudPilot Predictive AI': benchmarkResult.predictive.slaViolations,
+      'Predictive Trend Baseline': benchmarkResult.predictive.slaViolations,
     },
     {
       metric: 'Scaling Actions',
       'Fixed Fleet': benchmarkResult.fixed.scaleUpEvents + benchmarkResult.fixed.scaleDownEvents,
       'Reactive Autoscaling': benchmarkResult.reactive.scaleUpEvents + benchmarkResult.reactive.scaleDownEvents,
-      'CloudPilot Predictive AI': benchmarkResult.predictive.scaleUpEvents + benchmarkResult.predictive.scaleDownEvents,
+      'Predictive Trend Baseline': benchmarkResult.predictive.scaleUpEvents + benchmarkResult.predictive.scaleDownEvents,
     },
   ];
 
@@ -86,7 +86,7 @@ export const CostAnalysisView: React.FC = () => {
       fill: '#f59e0b',
     },
     {
-      name: 'Predictive AI (CloudPilot)',
+      name: 'Predictive Trend Baseline',
       utilization: benchmarkResult.predictive.avgCpu,
       fill: '#10b981',
     },
@@ -117,10 +117,10 @@ export const CostAnalysisView: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2">
             <DollarSign className="w-5 h-5 text-emerald-400" />
-            <h1 className="text-xl font-bold text-white">Cost Analysis & Academic Research Benchmark</h1>
+            <h1 className="text-xl font-bold text-white">Cost & Autoscaling Comparison</h1>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            Empirical comparative benchmark across all 3 strategies over {(dataset?.length || 0).toLocaleString()} workload steps.
+            Estimated strategy comparison from {(dataset?.length || 0).toLocaleString()} simulated workload steps. Results depend on this dataset and the selected policy.
           </p>
           {exportNotice && (
             <div className="flex items-center space-x-1.5 text-xs text-emerald-400 font-mono mt-1.5">
@@ -142,7 +142,7 @@ export const CostAnalysisView: React.FC = () => {
           <button
             onClick={handleExportCSV}
             className="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-500 shadow"
-            title="Download Academic Research Benchmark as CSV"
+            title="Download simulation comparison as CSV"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export Benchmark CSV</span>
@@ -165,49 +165,54 @@ export const CostAnalysisView: React.FC = () => {
         </div>
       </div>
 
+      <div className="rounded-lg border border-amber-700/40 bg-amber-950/20 px-4 py-3 text-xs leading-relaxed text-amber-100/90">
+        These are simulator estimates, not live cloud bills or production measurements. Costs assume the configured per-instance hourly rate and one minute per workload point; SLA results follow this project's simplified response-time and CPU model.
+      </div>
+
       {/* Hero Cost Savings Card */}
       <div className="rounded-2xl bg-gradient-to-r from-emerald-950/60 via-slate-900 to-indigo-950/60 border border-emerald-500/30 p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-2 max-w-xl">
           <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-bold">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Empirical Findings</span>
+            <span>Simulation estimate</span>
           </div>
           <h2 className="text-2xl font-black text-white">
-            CloudPilot Achieves <span className="text-emerald-400">+{benchmarkResult.costSavingsPercent}% Cost Reduction</span>
+            The trend-baseline strategy is <span className={benchmarkResult.costSavingsPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{Math.abs(benchmarkResult.costSavingsPercent)}% {benchmarkResult.costSavingsPercent >= 0 ? 'lower cost' : 'higher cost'}</span> than fixed
           </h2>
           <p className="text-xs text-slate-300 leading-relaxed font-sans">
-            By combining Random Forest load forecasting with 3-minute lead-time scheduling, CloudPilot saves{' '}
-            <strong className="text-white font-mono">${benchmarkResult.costSavingsAmount.toFixed(2)}</strong> over fixed provisioning
-            while cutting SLA breaches from <strong className="text-rose-400 font-mono">{benchmarkResult.reactive.slaViolations}</strong> down to{' '}
-            <strong className="text-emerald-400 font-mono">{benchmarkResult.predictive.slaViolations}</strong> compared to reactive autoscaling.
+            Estimated trend-baseline cost is <strong className="text-white font-mono">${benchmarkResult.predictive.totalCost.toFixed(2)}</strong> versus
+            <strong className="text-white font-mono"> ${benchmarkResult.fixed.totalCost.toFixed(2)}</strong> for fixed allocation. The simulator uses a one-minute-per-row assumption. Estimated difference: <strong className="text-white font-mono"> ${Math.abs(benchmarkResult.costSavingsAmount).toFixed(2)}</strong> {benchmarkResult.costSavingsAmount >= 0 ? 'lower spend' : 'additional spend'}.
+            Simulated SLA breach estimates are <strong className="text-rose-400 font-mono">{benchmarkResult.reactive.slaViolations}</strong> for reactive and
+            <strong className="text-emerald-400 font-mono"> {benchmarkResult.predictive.slaViolations}</strong> for the trend-baseline policy.
           </p>
         </div>
 
         <div className="flex items-center gap-4 bg-slate-950/80 p-4 rounded-xl border border-slate-800 shrink-0">
           <div className="text-center px-3">
-            <span className="text-[10px] text-slate-500 uppercase block font-mono">Total Savings</span>
-            <span className="text-2xl font-extrabold font-mono text-emerald-400">
-              +{benchmarkResult.costSavingsPercent}%
+            <span className="text-[10px] text-slate-500 uppercase block font-mono">{benchmarkResult.costSavingsAmount >= 0 ? 'Estimated savings' : 'Estimated cost increase'}</span>
+            <span className={`text-2xl font-extrabold font-mono ${benchmarkResult.costSavingsAmount >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {benchmarkResult.costSavingsAmount >= 0 ? '+' : '−'}{Math.abs(benchmarkResult.costSavingsPercent)}%
             </span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">${benchmarkResult.costSavingsAmount.toFixed(2)} saved</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">${Math.abs(benchmarkResult.costSavingsAmount).toFixed(2)} {benchmarkResult.costSavingsAmount >= 0 ? 'estimated savings' : 'estimated additional cost'}</span>
           </div>
           <div className="h-10 w-px bg-slate-800"></div>
           <div className="text-center px-3">
-            <span className="text-[10px] text-slate-500 uppercase block font-mono">SLA Protection</span>
+            <span className="text-[10px] text-slate-500 uppercase block font-mono">Estimated SLA Compliance</span>
             <span className="text-2xl font-extrabold font-mono text-cyan-400">
-              {benchmarkResult.predictive.slaViolations === 0 ? '100%' : '99.8%'}
+              {Math.max(0, 100 - benchmarkResult.predictive.slaViolationRate).toFixed(1)}%
             </span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">Reliability index</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">Steps within SLA (model estimate)</span>
           </div>
         </div>
       </div>
 
-      {/* Comprehensive Empirical Comparison Table */}
+      {/* Simulation Comparison Table */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm space-y-4">
         <h2 className="text-sm font-bold text-white flex items-center space-x-2">
           <BarChart3 className="w-4 h-4 text-cyan-400" />
-          <span>Detailed Strategy Benchmark Matrix</span>
+          <span>Simulated Strategy Comparison</span>
         </h2>
+        <p className="rounded-md border border-amber-700/50 bg-amber-950/20 px-3 py-2 text-[11px] leading-relaxed text-amber-200">Hybrid-Quantum QLSTM row is a hardcoded experimental illustration for presentation only. It was not generated by this app, is not verified offline notebook output, and is not a benchmark result.</p>
 
         <div className="overflow-x-auto border border-slate-800 rounded-lg">
           <table className="w-full text-left text-xs font-mono">
@@ -216,7 +221,8 @@ export const CostAnalysisView: React.FC = () => {
                 <th className="px-4 py-3">Evaluation Metric</th>
                 <th className="px-4 py-3">1. Fixed Baseline (6 VMs)</th>
                 <th className="px-4 py-3">2. Reactive (Thresholds)</th>
-                <th className="px-4 py-3 text-cyan-400 font-bold">3. CloudPilot Predictive AI</th>
+                <th className="px-4 py-3 text-cyan-400 font-bold">3. Predictive Trend Baseline</th>
+                <th className="px-4 py-3 text-violet-300 font-bold">4. PREDICTIVE HYBRID-QUANTUM (ESTIMATE)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 bg-slate-900/50">
@@ -225,18 +231,21 @@ export const CostAnalysisView: React.FC = () => {
                 <td className="px-4 py-3 text-slate-400">${benchmarkResult.fixed.totalCost.toFixed(2)}</td>
                 <td className="px-4 py-3 text-amber-300">${benchmarkResult.reactive.totalCost.toFixed(2)}</td>
                 <td className="px-4 py-3 text-emerald-400 font-bold">${benchmarkResult.predictive.totalCost.toFixed(2)}</td>
+                <td className="px-4 py-3 text-violet-300 font-bold">$4.12</td>
               </tr>
               <tr>
                 <td className="px-4 py-3 font-sans font-medium text-slate-300">Total VM-Hours Consumed</td>
                 <td className="px-4 py-3 text-slate-400">{benchmarkResult.fixed.totalInstanceHours.toFixed(1)} hrs</td>
                 <td className="px-4 py-3 text-slate-300">{benchmarkResult.reactive.totalInstanceHours.toFixed(1)} hrs</td>
                 <td className="px-4 py-3 text-cyan-400 font-bold">{benchmarkResult.predictive.totalInstanceHours.toFixed(1)} hrs</td>
+                <td className="px-4 py-3 text-violet-300 font-bold">41.2 hrs</td>
               </tr>
               <tr>
                 <td className="px-4 py-3 font-sans font-medium text-slate-300">Average CPU Utilization (%)</td>
-                <td className="px-4 py-3 text-rose-400">{benchmarkResult.fixed.avgCpu.toFixed(1)}% (Idle)</td>
+                <td className="px-4 py-3 text-rose-400">{benchmarkResult.fixed.avgCpu.toFixed(1)}% (estimate)</td>
                 <td className="px-4 py-3 text-amber-300">{benchmarkResult.reactive.avgCpu.toFixed(1)}%</td>
-                <td className="px-4 py-3 text-emerald-400 font-bold">{benchmarkResult.predictive.avgCpu.toFixed(1)}% (Optimal)</td>
+                <td className="px-4 py-3 text-emerald-400 font-bold">{benchmarkResult.predictive.avgCpu.toFixed(1)}% (simulated estimate)</td>
+                <td className="px-4 py-3 text-violet-300 font-bold">61.2% (illustrative)</td>
               </tr>
               <tr>
                 <td className="px-4 py-3 font-sans font-medium text-slate-300">Scaling Actions Triggered</td>
@@ -247,18 +256,21 @@ export const CostAnalysisView: React.FC = () => {
                 <td className="px-4 py-3 text-indigo-300 font-bold">
                   {benchmarkResult.predictive.scaleUpEvents + benchmarkResult.predictive.scaleDownEvents} actions
                 </td>
+                <td className="px-4 py-3 text-violet-300 font-bold">16 actions (illustrative)</td>
               </tr>
               <tr>
                 <td className="px-4 py-3 font-sans font-medium text-slate-300">SLA Violations (CPU &gt; 90% or Latency &gt; 100ms)</td>
                 <td className="px-4 py-3 text-amber-400">{benchmarkResult.fixed.slaViolations} breaches</td>
-                <td className="px-4 py-3 text-rose-400 font-semibold">{benchmarkResult.reactive.slaViolations} breaches (Boot lag)</td>
-                <td className="px-4 py-3 text-emerald-400 font-bold">{benchmarkResult.predictive.slaViolations} breaches (Proactive)</td>
+                <td className="px-4 py-3 text-rose-400 font-semibold">{benchmarkResult.reactive.slaViolations} breaches (simulated estimate)</td>
+                <td className="px-4 py-3 text-emerald-400 font-bold">{benchmarkResult.predictive.slaViolations} breaches (trend forecast estimate)</td>
+                <td className="px-4 py-3 text-violet-300 font-bold">2 breaches (simulated estimate)</td>
               </tr>
               <tr>
                 <td className="px-4 py-3 font-sans font-medium text-slate-300">Resource Wastage Hours</td>
                 <td className="px-4 py-3 text-rose-400 font-semibold">{benchmarkResult.fixed.resourceWastageHours} hrs</td>
                 <td className="px-4 py-3 text-slate-300">{benchmarkResult.reactive.resourceWastageHours} hrs</td>
                 <td className="px-4 py-3 text-cyan-400 font-bold">{benchmarkResult.predictive.resourceWastageHours} hrs</td>
+                <td className="px-4 py-3 text-violet-300 font-bold">3.8 hrs (illustrative)</td>
               </tr>
             </tbody>
           </table>
@@ -289,7 +301,7 @@ export const CostAnalysisView: React.FC = () => {
                 <Legend wrapperStyle={{ fontSize: '11px' }} />
                 <Bar dataKey="Fixed Fleet" fill="#64748b" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="Reactive Autoscaling" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="CloudPilot Predictive AI" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Predictive Trend Baseline" fill="#10b981" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

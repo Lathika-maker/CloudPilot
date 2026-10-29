@@ -25,52 +25,60 @@ class WorkloadPredictor:
 
     def predict_next(self, recent_history_rps: list, current_hour: int = 14, current_day: int = 2) -> dict:
         """
-        Forecasts workload for horizons t+5m, t+10m, and t+15m.
+        Recursively forecasts workload at t+5m, t+10m, and t+15m.
+        Requires an actually trained model and observed workload history.
+        The returned range is illustrative, not a calibrated confidence interval.
         """
-        if not recent_history_rps or len(recent_history_rps) < 5:
-            current = recent_history_rps[-1] if recent_history_rps else 300
-            return {
-                "t_5m": current * 1.05,
-                "t_10m": current * 1.10,
-                "t_15m": current * 1.12,
-                "confidence_interval": [current * 0.95, current * 1.25]
-            }
+        if self.model is None:
+            raise RuntimeError("No trained model is available. Call /api/train first.")
+        if not recent_history_rps or len(recent_history_rps) < 15:
+            raise ValueError("At least 15 recent RPS observations are required for forecasting.")
 
-        curr = recent_history_rps[-1]
-        lag1 = recent_history_rps[-1]
-        lag2 = recent_history_rps[-2]
-        lag5 = recent_history_rps[-5]
-        mean5 = np.mean(recent_history_rps[-5:])
-        mean15 = np.mean(recent_history_rps[-15:]) if len(recent_history_rps) >= 15 else mean5
-        std5 = np.std(recent_history_rps[-5:])
+        simulated_history = [max(0.0, float(value)) for value in recent_history_rps]
+        forecasts = []
 
-        sin_h = np.sin(2 * np.pi * current_hour / 24.0)
-        cos_h = np.cos(2 * np.pi * current_hour / 24.0)
-        sin_d = np.sin(2 * np.pi * current_day / 7.0)
-        cos_d = np.cos(2 * np.pi * current_day / 7.0)
+        for step in range(1, 4):
+            forecast_minutes = step * 5
+            total_minutes = current_hour * 60 + forecast_minutes
+            forecast_hour = (total_minutes // 60) % 24
+            forecast_day = (current_day + total_minutes // (24 * 60)) % 7
 
-        feature_vector = np.array([[
-            sin_h, cos_h, sin_d, cos_d,
-            lag1, lag2, lag5,
-            mean5, mean15, std5
-        ]])
+            lag1 = simulated_history[-1]
+            lag2 = simulated_history[-2]
+            lag5 = simulated_history[-5:]
+            mean5 = float(np.mean(lag5))
+            last15 = simulated_history[-15:]
+            mean15 = float(np.mean(last15))
+            std5 = float(np.std(lag5, ddof=1)) if len(lag5) > 1 else 0.0
 
-        if self.model:
-            pred_5m = float(self.model.predict(feature_vector)[0])
-        else:
-            trend = (lag1 - lag5) / 5.0
-            pred_5m = lag1 + trend * 2.0
+            feature_vector = np.array([[
+                np.sin(2 * np.pi * forecast_hour / 24.0),
+                np.cos(2 * np.pi * forecast_hour / 24.0),
+                np.sin(2 * np.pi * forecast_day / 7.0),
+                np.cos(2 * np.pi * forecast_day / 7.0),
+                lag1, lag2, simulated_history[-4],
+                mean5, mean15, std5,
+            ]])
 
-        pred_10m = pred_5m * 1.05
-        pred_15m = pred_5m * 1.08
+            predicted = max(0.0, float(self.model.predict(feature_vector)[0]))
+            predicted = round(predicted, 1)
+            forecasts.append(predicted)
+            simulated_history.append(predicted)
 
+        current = float(recent_history_rps[-1])
+        ten_minute = forecasts[1]
         return {
-            "current_rps": curr,
-            "predicted_workload_5m": round(pred_5m, 1),
-            "predicted_workload_10m": round(pred_10m, 1),
-            "predicted_workload_15m": round(pred_15m, 1),
-            "confidence_lower": round(pred_10m * 0.90, 1),
-            "confidence_upper": round(pred_10m * 1.10, 1)
+            "current_rps": current,
+            "predicted_workload_5m": forecasts[0],
+            "predicted_workload_10m": forecasts[1],
+            "predicted_workload_15m": forecasts[2],
+            "estimated_range_10m": {
+                "lower": round(max(0.0, ten_minute * 0.90), 1),
+                "upper": round(ten_minute * 1.10, 1),
+            },
+            "range_note": "Illustrative +/-10% range; not a calibrated statistical confidence interval.",
+            "model": "Random Forest Regressor",
+            "forecast_steps": 3,
         }
 
 if __name__ == "__main__":

@@ -26,6 +26,7 @@ interface TreeNode {
   value?: number;
   featureIndex?: number;
   threshold?: number;
+  gain?: number;
   left?: TreeNode;
   right?: TreeNode;
 }
@@ -132,6 +133,7 @@ class DecisionTreeRegressor {
       isLeaf: false,
       featureIndex: bestFeatureIndex,
       threshold: bestThreshold,
+      gain: bestVarReduction * nSamples,
       left: this.buildTree(leftX, leftY, depth + 1),
       right: this.buildTree(rightX, rightY, depth + 1),
     };
@@ -148,6 +150,20 @@ class DecisionTreeRegressor {
       }
     }
     return node.value ?? 0;
+  }
+
+  getFeatureImportances(featureCount: number): number[] {
+    const importances = new Array(featureCount).fill(0);
+    const visit = (node: TreeNode | null | undefined) => {
+      if (!node || node.isLeaf) return;
+      if (node.featureIndex !== undefined && node.featureIndex >= 0 && node.featureIndex < featureCount) {
+        importances[node.featureIndex] += node.gain ?? 0;
+      }
+      visit(node.left);
+      visit(node.right);
+    };
+    visit(this.root);
+    return importances;
   }
 }
 
@@ -198,6 +214,17 @@ export class RandomForestRegressor {
     const mean = preds.reduce((a, b) => a + b, 0) / preds.length;
     const variance = preds.reduce((sum, p) => sum + Math.pow(p - mean, 2), 0) / preds.length;
     return { mean, std: Math.sqrt(variance) };
+  }
+
+  getFeatureImportances(featureCount: number): number[] {
+    const totals = new Array(featureCount).fill(0);
+    for (const tree of this.trees) {
+      tree.getFeatureImportances(featureCount).forEach((gain, index) => {
+        totals[index] += gain;
+      });
+    }
+    const total = totals.reduce((sum, value) => sum + value, 0);
+    return total > 0 ? totals.map((value) => value / total) : totals;
   }
 }
 
@@ -251,11 +278,25 @@ export class AutoregressiveModel {
   predict(X: number[][]): number[] {
     return X.map((r) => this.predictRow(r));
   }
+
+  getFeatureImportances(): number[] {
+    const magnitudes = this.weights.map((weight) => Math.abs(weight));
+    const total = magnitudes.reduce((sum, value) => sum + value, 0);
+    return total > 0 ? magnitudes.map((value) => value / total) : magnitudes;
+  }
 }
 
 export class MLEngine {
   private rfModel: RandomForestRegressor | null = null;
   private arModel: AutoregressiveModel | null = null;
+
+  /** Clear trained state whenever the workload dataset changes. */
+  reset(): void {
+    this.rfModel = null;
+    this.arModel = null;
+    this.metrics = null;
+    this.isTrained = false;
+  }
   private currentConfig: MLModelConfig = {
     modelType: 'random_forest',
     targetMetric: 'requests_per_second',
@@ -280,10 +321,19 @@ export class MLEngine {
     'Trend Delta',
   ];
 
+  private getMetricValue(metric: WorkloadMetric, targetKey: string): number {
+    if (targetKey.startsWith('source:')) {
+      const value = metric.source_metrics?.[targetKey.slice('source:'.length)];
+      return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+    }
+    const value = (metric as unknown as Record<string, unknown>)[targetKey];
+    return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  }
+
   /**
    * Extracts engineered features from raw metric series.
    */
-  extractFeatures(data: WorkloadMetric[], targetKey: 'requests_per_second' | 'active_users'): {
+  extractFeatures(data: WorkloadMetric[], targetKey: string): {
     X: number[][];
     y: number[];
     timestamps: string[];
@@ -295,7 +345,7 @@ export class MLEngine {
 
     for (let i = 15; i < data.length; i++) {
       const item = data[i];
-      const targetVal = item[targetKey];
+      const targetVal = this.getMetricValue(item, targetKey);
       const date = new Date(item.timestamp);
 
       const hour = isNaN(date.getUTCHours()) ? 12 : date.getUTCHours();
@@ -309,15 +359,15 @@ export class MLEngine {
       const minuteCos = Math.cos((minute / 60) * 2 * Math.PI);
 
       // Lag features
-      const lag1 = data[i - 1][targetKey];
-      const lag2 = data[i - 2][targetKey];
-      const lag5 = data[i - 5][targetKey];
+      const lag1 = this.getMetricValue(data[i - 1], targetKey);
+      const lag2 = this.getMetricValue(data[i - 2], targetKey);
+      const lag5 = this.getMetricValue(data[i - 5], targetKey);
 
       // Rolling window features
-      const slice5 = data.slice(i - 5, i).map((d) => d[targetKey]);
+      const slice5 = data.slice(i - 5, i).map((d) => this.getMetricValue(d, targetKey));
       const rollingMean5 = slice5.reduce((a, b) => a + b, 0) / 5;
 
-      const slice15 = data.slice(i - 15, i).map((d) => d[targetKey]);
+      const slice15 = data.slice(i - 15, i).map((d) => this.getMetricValue(d, targetKey));
       const rollingMean15 = slice15.reduce((a, b) => a + b, 0) / 15;
 
       const variance5 = slice5.reduce((sum, v) => sum + Math.pow(v - rollingMean5, 2), 0) / 5;
@@ -380,15 +430,17 @@ export class MLEngine {
 
     let testPredictions: number[] = [];
 
-    if (this.currentConfig.modelType === 'random_forest' || this.currentConfig.modelType === 'lstm_sim') {
+    if (this.currentConfig.modelType === 'random_forest') {
       const rf = new RandomForestRegressor(16, 7);
       rf.fit(X_train, y_train);
       this.rfModel = rf;
+      this.arModel = null;
       testPredictions = rf.predict(X_test);
     } else {
       const ar = new AutoregressiveModel();
       ar.fit(X_train, y_train);
       this.arModel = ar;
+      this.rfModel = null;
       testPredictions = ar.predict(X_test);
     }
 
@@ -396,14 +448,22 @@ export class MLEngine {
     const n = y_test.length;
     let sumAbsErr = 0;
     let sumSqErr = 0;
+    let sumAbsolutePercentageError = 0;
+    let percentageErrorCount = 0;
     const yTestMean = y_test.reduce((a, b) => a + b, 0) / n;
     let totalSumSquares = 0;
 
     for (let i = 0; i < n; i++) {
-      const err = y_test[i] - testPredictions[i];
+      const actual = y_test[i];
+      const err = actual - testPredictions[i];
       sumAbsErr += Math.abs(err);
       sumSqErr += err * err;
-      totalSumSquares += Math.pow(y_test[i] - yTestMean, 2);
+      totalSumSquares += Math.pow(actual - yTestMean, 2);
+      // MAPE is undefined for zero-valued targets; omit those points from its denominator.
+      if (Math.abs(actual) > Number.EPSILON) {
+        sumAbsolutePercentageError += Math.abs(err / actual);
+        percentageErrorCount += 1;
+      }
     }
 
     const mae = Math.round((sumAbsErr / n) * 100) / 100;
@@ -411,23 +471,31 @@ export class MLEngine {
     const r2 =
       totalSumSquares === 0
         ? 1.0
-        : Math.max(-1.0, Math.min(0.99, Math.round((1 - sumSqErr / totalSumSquares) * 1000) / 1000));
+        : Math.round((1 - sumSqErr / totalSumSquares) * 1000) / 1000;
+    const mape = percentageErrorCount > 0
+      ? Math.round((sumAbsolutePercentageError / percentageErrorCount) * 1000) / 10
+      : undefined;
 
-    // Calculate feature importances
-    const featureWeights = [
-      { name: 'Lag 1 (Immediate Previous Load)', weight: 0.32 },
-      { name: 'Rolling Mean 5m', weight: 0.24 },
-      { name: 'Rolling Mean 15m', weight: 0.16 },
-      { name: 'Hour (Diurnal Component)', weight: 0.12 },
-      { name: 'Lag 2', weight: 0.08 },
-      { name: 'Trend Delta', weight: 0.05 },
-      { name: 'Rolling Volatility Std', weight: 0.03 },
+    // Derive feature scores from observed tree split gains or normalized baseline coefficient magnitudes.
+    const featureNames = [
+      'hour_sin', 'hour_cos', 'minute_sin', 'minute_cos', 'day_of_week',
+      'lag_1', 'lag_2', 'lag_5', 'rolling_mean_5m', 'rolling_mean_15m',
+      'rolling_std_5m', 'trend_delta',
     ];
+    const rawFeatureScores = this.currentConfig.modelType === 'autoregressive'
+      ? (this.arModel?.getFeatureImportances() ?? [])
+      : (this.rfModel?.getFeatureImportances(featureNames.length) ?? []);
+    const scoreTotal = rawFeatureScores.reduce((sum, value) => sum + value, 0);
+    const featureWeights = featureNames.map((name, index) => ({
+      name,
+      weight: scoreTotal > 0 ? rawFeatureScores[index] / scoreTotal : 0,
+    }));
 
     this.metrics = {
       mae,
       rmse,
       r2,
+      mape,
       sampleCount: data.length,
       trainedAt: new Date().toISOString(),
       modelType: this.currentConfig.modelType,
@@ -461,6 +529,7 @@ export class MLEngine {
     }
 
     const targetKey = this.currentConfig.targetMetric;
+    const sourceTarget = targetKey.startsWith('source:');
     const simulatedHistory = [...recentHistory];
     const predictions: PredictionPoint[] = [];
 
@@ -480,14 +549,14 @@ export class MLEngine {
       const minuteSin = Math.sin((minute / 60) * 2 * Math.PI);
       const minuteCos = Math.cos((minute / 60) * 2 * Math.PI);
 
-      const lag1 = simulatedHistory[n - 1][targetKey];
-      const lag2 = simulatedHistory[n - 2][targetKey];
-      const lag5 = simulatedHistory[n - 5][targetKey];
+      const lag1 = this.getMetricValue(simulatedHistory[n - 1], targetKey);
+      const lag2 = this.getMetricValue(simulatedHistory[n - 2], targetKey);
+      const lag5 = this.getMetricValue(simulatedHistory[n - 5], targetKey);
 
-      const slice5 = simulatedHistory.slice(n - 5, n).map((d) => d[targetKey]);
+      const slice5 = simulatedHistory.slice(n - 5, n).map((d) => this.getMetricValue(d, targetKey));
       const rollingMean5 = slice5.reduce((a, b) => a + b, 0) / 5;
 
-      const slice15 = simulatedHistory.slice(n - 15, n).map((d) => d[targetKey]);
+      const slice15 = simulatedHistory.slice(n - 15, n).map((d) => this.getMetricValue(d, targetKey));
       const rollingMean15 = slice15.reduce((a, b) => a + b, 0) / 15;
 
       const variance5 = slice5.reduce((sum, v) => sum + Math.pow(v - rollingMean5, 2), 0) / 5;
@@ -522,7 +591,7 @@ export class MLEngine {
         stdDev = 12 * (1 + step * 0.06);
       }
 
-      predictedVal = Math.max(10, Math.round(predictedVal));
+      predictedVal = Math.max(0, Math.round(predictedVal));
 
       // Append into simulated history so multi-step recursive autoregression works
       const dummyMetric: WorkloadMetric = {
@@ -530,10 +599,12 @@ export class MLEngine {
         cpu_usage: 65,
         memory_usage: 50,
         network_usage: predictedVal * 0.03,
-        requests_per_second: targetKey === 'requests_per_second' ? predictedVal : predictedVal * 0.28,
-        active_users: targetKey === 'active_users' ? predictedVal : Math.round(predictedVal * 3.5),
+        requests_per_second: targetKey === 'requests_per_second' ? predictedVal : 0,
+        active_users: targetKey === 'active_users' ? predictedVal : 0,
         response_time: 25,
         active_instances: Math.max(1, Math.ceil(predictedVal / 250)),
+        ...(!sourceTarget ? { [targetKey]: predictedVal } : {}),
+        ...(sourceTarget ? { source_metrics: { [targetKey.slice('source:'.length)]: predictedVal } } : {}),
       };
       simulatedHistory.push(dummyMetric);
 
@@ -541,10 +612,16 @@ export class MLEngine {
       const upperConfidence = Math.round(predictedVal + 1.96 * stdDev);
 
       // Estimate required instances from prediction (Capacity ~250 RPS at target 70% CPU)
-      const estimatedRps = targetKey === 'requests_per_second' ? predictedVal : predictedVal * 0.28;
-      const recommendedInstances = Math.max(1, Math.ceil(estimatedRps / (250 * 0.70)));
-      const cpuRequired = Math.min(99, Math.max(15, Math.round((estimatedRps / (recommendedInstances * 250)) * 70)));
-      const memoryRequired = Math.min(95, Math.max(25, Math.round(38 + (estimatedRps / 1200) * 35)));
+      // Capacity recommendations are valid only when the forecast target is requests/second.
+      // Other metrics are forecast in their source units and must not be silently converted to RPS.
+      const hasRpsCapacityModel = targetKey === 'requests_per_second';
+      const recommendedInstances = hasRpsCapacityModel ? Math.max(1, Math.ceil(predictedVal / (250 * 0.70))) : undefined;
+      const cpuRequired = hasRpsCapacityModel && recommendedInstances
+        ? Math.min(99, Math.max(15, Math.round((predictedVal / (recommendedInstances * 250)) * 70)))
+        : undefined;
+      const memoryRequired = hasRpsCapacityModel
+        ? Math.min(95, Math.max(25, Math.round(38 + (predictedVal / 1200) * 35)))
+        : undefined;
 
       predictions.push({
         timestamp: predTime,
@@ -553,7 +630,9 @@ export class MLEngine {
         upperConfidence,
         cpuRequired,
         memoryRequired,
-        recommendedInstances,
+        ...(recommendedInstances !== undefined ? { recommendedInstances } : {}),
+        ...(cpuRequired !== undefined ? { cpuRequired } : {}),
+        ...(memoryRequired !== undefined ? { memoryRequired } : {}),
       });
     }
 
@@ -562,11 +641,11 @@ export class MLEngine {
 
   predictSingle(
     historySlice: WorkloadMetric[],
-    targetKey: 'requests_per_second' | 'active_users' = 'requests_per_second'
+    targetKey: string = 'requests_per_second'
   ): number {
     if (!this.isTrained || !historySlice || historySlice.length < 15) {
       const last = historySlice && historySlice.length > 0 ? historySlice[historySlice.length - 1] : null;
-      return last ? last[targetKey] : 0;
+      return last ? this.getMetricValue(last, targetKey) : 0;
     }
     const n = historySlice.length;
     const date = new Date(historySlice[n - 1].timestamp);
@@ -579,14 +658,14 @@ export class MLEngine {
     const minuteSin = Math.sin((minute / 60) * 2 * Math.PI);
     const minuteCos = Math.cos((minute / 60) * 2 * Math.PI);
 
-    const lag1 = historySlice[n - 1][targetKey];
-    const lag2 = historySlice[n - 2][targetKey];
-    const lag5 = historySlice[n - 5][targetKey];
+    const lag1 = this.getMetricValue(historySlice[n - 1], targetKey);
+    const lag2 = this.getMetricValue(historySlice[n - 2], targetKey);
+    const lag5 = this.getMetricValue(historySlice[n - 5], targetKey);
 
-    const slice5 = historySlice.slice(n - 5, n).map((d) => d[targetKey]);
+    const slice5 = historySlice.slice(n - 5, n).map((d) => this.getMetricValue(d, targetKey));
     const rollingMean5 = slice5.reduce((a, b) => a + b, 0) / 5;
 
-    const slice15 = historySlice.slice(n - 15, n).map((d) => d[targetKey]);
+    const slice15 = historySlice.slice(n - 15, n).map((d) => this.getMetricValue(d, targetKey));
     const rollingMean15 = slice15.reduce((a, b) => a + b, 0) / 15;
 
     const variance5 = slice5.reduce((sum, v) => sum + Math.pow(v - rollingMean5, 2), 0) / 5;
@@ -611,9 +690,9 @@ export class MLEngine {
 
     if (this.rfModel) {
       const res = this.rfModel.predictSingle(featureRow);
-      return Math.max(10, Math.round(res.mean));
+      return Math.max(0, Math.round(res.mean));
     } else if (this.arModel) {
-      return Math.max(10, Math.round(this.arModel.predictRow(featureRow)));
+      return Math.max(0, Math.round(this.arModel.predictRow(featureRow)));
     }
     return lag1;
   }

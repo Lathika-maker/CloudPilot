@@ -48,7 +48,7 @@ export const WhatIfSimulatorView: React.FC = () => {
   const costData = [
     { name: 'Overprovisioned Fixed (6 VMs)', cost: result.fixedCostPerHour, fill: '#64748b' },
     { name: 'Current Allocation', cost: Number((input.currentInstances * input.costPerHour).toFixed(2)), fill: '#f59e0b' },
-    { name: 'CloudPilot Recommended', cost: result.estimatedCostPerHour, fill: '#10b981' },
+    { name: 'Rule-Based Recommendation', cost: result.estimatedCostPerHour, fill: '#10b981' },
   ];
 
   const resetToPromptExample = () => {
@@ -74,7 +74,7 @@ export const WhatIfSimulatorView: React.FC = () => {
             <h1 className="text-xl font-bold text-white">Manual &quot;What-If&quot; Scaling Lab</h1>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            Test immediate scenario hypotheses: tweak sliders to see instant ML predictions, required fleet size, and economic impact.
+            Explore a hypothetical workload with rule-based capacity and cost estimates. This calculator does not run the trained ML model or use uploaded telemetry.
           </p>
         </div>
         <button

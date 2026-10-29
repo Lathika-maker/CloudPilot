@@ -40,9 +40,10 @@ def engineer_features(df: pd.DataFrame, target_col: str = "requests_per_second")
     df['lag_5'] = df[target_col].shift(5)
 
     # Rolling statistics
-    df['rolling_mean_5'] = df[target_col].rolling(window=5).mean()
-    df['rolling_mean_15'] = df[target_col].rolling(window=15).mean()
-    df['rolling_std_5'] = df[target_col].rolling(window=5).std().fillna(0)
+    # Shift rolling features one step into the past so they never include the target row.
+    df['rolling_mean_5'] = df[target_col].rolling(window=5).mean().shift(1)
+    df['rolling_mean_15'] = df[target_col].rolling(window=15).mean().shift(1)
+    df['rolling_std_5'] = df[target_col].rolling(window=5).std().shift(1)
 
     # Clean missing boundary rows
     df_clean = df.dropna().reset_index(drop=True)

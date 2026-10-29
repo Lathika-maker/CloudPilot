@@ -169,18 +169,45 @@ export function parseCSVData(csvText: string): {
   rows: Record<string, string>[];
   preview: Record<string, string>[];
 } {
-  const lines = csvText.trim().split(/\r?\n/);
-  if (lines.length < 2) {
+  // Parse RFC-4180-style quoted fields (including commas, escaped quotes, and
+  // line breaks inside quoted cells) instead of splitting each line on commas.
+  const matrix: string[][] = [];
+  let row: string[] = [];
+  let cell = '';
+  let quoted = false;
+  for (let i = 0; i < csvText.length; i++) {
+    const ch = csvText[i];
+    if (ch === '"') {
+      if (quoted && csvText[i + 1] === '"') {
+        cell += '"';
+        i++;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (ch === ',' && !quoted) {
+      row.push(cell.trim());
+      cell = '';
+    } else if ((ch === '\n' || ch === '\r') && !quoted) {
+      if (ch === '\r' && csvText[i + 1] === '\n') i++;
+      row.push(cell.trim());
+      if (row.some((value) => value !== '')) matrix.push(row);
+      row = [];
+      cell = '';
+    } else {
+      cell += ch;
+    }
+  }
+  if (quoted) throw new Error('CSV contains an unclosed quoted field.');
+  row.push(cell.trim());
+  if (row.some((value) => value !== '')) matrix.push(row);
+  if (matrix.length < 2) {
     throw new Error('CSV file must have at least a header row and one data row.');
   }
 
-  const headers = lines[0].split(',').map((h) => h.trim().replace(/^["']|["']$/g, ''));
+  const headers = matrix[0].map((h) => h.replace(/^['"]|['"]$/g, '').trim());
+  if (headers.some((h) => !h)) throw new Error('CSV contains an empty column name.');
   const rows: Record<string, string>[] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    const cols = line.split(',').map((c) => c.trim().replace(/^["']|["']$/g, ''));
+  for (const cols of matrix.slice(1)) {
     const rowObj: Record<string, string> = {};
     headers.forEach((h, idx) => {
       rowObj[h] = cols[idx] !== undefined ? cols[idx] : '';
@@ -213,7 +240,7 @@ export function autoMapColumns(headers: string[]): Record<string, string> {
   const lowerHeaders = headers.map((h) => h.toLowerCase().replace(/[\s_\-]/g, ''));
 
   const patterns: Record<string, RegExp[]> = {
-    timestamp: [/time/, /date/, /timestamp/, /ts/, /datetime/],
+    timestamp: [/timestamp|datetime|epochtime|unixtime/, /^time$/, /^date$/, /^ts$/],
     cpu_usage: [/cpu/, /cpuutil/, /cpuusage/, /processor/],
     memory_usage: [/mem/, /ram/, /memory/, /memoryutil/],
     network_usage: [/net/, /network/, /bandwidth/, /io/, /throughput/],
@@ -223,6 +250,7 @@ export function autoMapColumns(headers: string[]): Record<string, string> {
     active_instances: [/instance/, /instances/, /vms/, /nodes/, /replicas/, /servers/],
   };
 
+  // Prefer explicit semantic matches first; never overwrite a stronger match.
   for (const [targetKey, regexes] of Object.entries(patterns)) {
     for (let i = 0; i < headers.length; i++) {
       const hLower = lowerHeaders[i];
@@ -232,6 +260,9 @@ export function autoMapColumns(headers: string[]): Record<string, string> {
       }
     }
   }
+
+  // Do not relabel a generic "value" column as requests/second. Generic numeric
+  // columns are preserved separately and can be selected as forecast targets.
 
   return mapping;
 }
@@ -243,29 +274,60 @@ export function normalizeMappedRows(
   rows: Record<string, string>[],
   mapping: Record<string, string>
 ): { metrics: WorkloadMetric[]; missingFields: string[] } {
-  const requiredTargets = [
-    'timestamp',
-    'cpu_usage',
-    'memory_usage',
-    'requests_per_second',
-    'active_users',
+  // Report every unobserved metric. Values are still populated with explicitly
+  // documented simulation defaults because downstream simulator modules currently
+  // consume a fixed schema; these defaults must not be described as source telemetry.
+  const telemetryTargets = [
+    'cpu_usage', 'memory_usage', 'network_usage', 'requests_per_second',
+    'active_users', 'response_time', 'active_instances',
   ];
-  const missingFields = requiredTargets.filter((f) => !mapping[f]);
+  const missingFields = [
+    ...(!mapping.timestamp ? ['timestamp (generated because the source has no timestamp column)'] : []),
+    ...telemetryTargets.filter((field) => !mapping[field]),
+  ];
 
   const metrics: WorkloadMetric[] = rows.map((row, index) => {
-    const rawTime = mapping.timestamp ? row[mapping.timestamp] : '';
-    let validTime = rawTime;
-    if (!validTime || isNaN(new Date(validTime).getTime())) {
+    const rawTime = mapping.timestamp ? String(row[mapping.timestamp] ?? '').trim() : '';
+    let validTime: string;
+    if (!mapping.timestamp) {
+      // Explicitly synthetic ordering timestamps for datasets with no time column.
       validTime = new Date(Date.now() + index * 60000).toISOString();
+    } else {
+      let parsedTime: number = NaN;
+      if (/^\d{10}$/.test(rawTime)) parsedTime = Number(rawTime) * 1000; // Unix seconds
+      else if (/^\d{13}$/.test(rawTime)) parsedTime = Number(rawTime); // Unix milliseconds
+      else parsedTime = Date.parse(rawTime);
+      if (!rawTime || !Number.isFinite(parsedTime)) {
+        throw new Error(`Invalid timestamp at data row ${index + 2}. Choose a valid date/time column or leave Timestamp unmapped to use generated ordering timestamps.`);
+      }
+      validTime = new Date(parsedTime).toISOString();
     }
 
-    const cpu = mapping.cpu_usage ? parseFloat(row[mapping.cpu_usage]) || 50 : 50;
-    const mem = mapping.memory_usage ? parseFloat(row[mapping.memory_usage]) || 40 : 40;
-    const net = mapping.network_usage ? parseFloat(row[mapping.network_usage]) || 12 : 12;
-    const rps = mapping.requests_per_second ? parseFloat(row[mapping.requests_per_second]) || 300 : 300;
-    const users = mapping.active_users ? parseFloat(row[mapping.active_users]) || Math.round(rps * 3.5) : Math.round(rps * 3.5);
-    const rt = mapping.response_time ? parseFloat(row[mapping.response_time]) || 24 : 24;
-    const inst = mapping.active_instances ? parseInt(row[mapping.active_instances], 10) || Math.max(1, Math.ceil(rps / 250)) : Math.max(1, Math.ceil(rps / 250));
+    // Preserve legitimate zero values. Using parseFloat(value) || fallback would
+    // incorrectly turn zero CPU, memory, RPS, and users into fabricated observations.
+    const readNumber = (target: string, fallback: number): number => {
+      const source = mapping[target];
+      if (!source || row[source] == null || row[source].trim() === '') return fallback;
+      const parsed = Number(row[source]);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+    const cpu = readNumber('cpu_usage', 50);
+    const mem = readNumber('memory_usage', 40);
+    const net = readNumber('network_usage', 12);
+    const rps = readNumber('requests_per_second', 300);
+    const users = readNumber('active_users', Math.round(rps * 3.5));
+    const rt = readNumber('response_time', 24);
+    const inst = Math.trunc(readNumber('active_instances', Math.max(1, Math.ceil(rps / 250))));
+
+    const mappedSourceColumns = new Set(Object.values(mapping).filter(Boolean));
+    const sourceMetrics: Record<string, number> = {};
+    for (const header of Object.keys(row)) {
+      if (mappedSourceColumns.has(header)) continue;
+      const raw = row[header]?.trim();
+      if (raw == null || raw === '') continue;
+      const value = Number(raw);
+      if (Number.isFinite(value)) sourceMetrics[header] = value;
+    }
 
     return {
       timestamp: validTime,
@@ -276,6 +338,7 @@ export function normalizeMappedRows(
       active_users: Math.max(0, Math.round(users)),
       response_time: Math.max(1, rt),
       active_instances: Math.max(1, inst),
+      source_metrics: sourceMetrics,
     };
   });
 

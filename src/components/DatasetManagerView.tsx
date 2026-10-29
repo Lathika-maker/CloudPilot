@@ -28,7 +28,6 @@ export const DatasetManagerView: React.FC = () => {
     loadSampleDataset,
     loadUploadedData,
     setActiveTab,
-    trainMLModel,
     startSimulation,
   } = useCloudPilot();
 
@@ -49,9 +48,9 @@ export const DatasetManagerView: React.FC = () => {
   const pageSize = 10;
 
   const targetFields = [
-    { key: 'timestamp', label: 'Timestamp / Date', required: true },
-    { key: 'requests_per_second', label: 'Requests / Sec (RPS)', required: true },
-    { key: 'cpu_usage', label: 'CPU Utilization %', required: true },
+    { key: 'timestamp', label: 'Timestamp / Date (optional; row order can be used)', required: false },
+    { key: 'requests_per_second', label: 'Requests per Second (if available)', required: false },
+    { key: 'cpu_usage', label: 'CPU Utilization % (if available)', required: false },
     { key: 'memory_usage', label: 'Memory / RAM %', required: false },
     { key: 'active_users', label: 'Active Concurrent Users', required: false },
     { key: 'network_usage', label: 'Network Bandwidth (MB/s)', required: false },
@@ -128,9 +127,26 @@ export const DatasetManagerView: React.FC = () => {
 
     try {
       const { metrics, missingFields } = normalizeMappedRows(parsedRows, columnMapping);
-      loadUploadedData(metrics, fileName || 'Uploaded Dataset', columnMapping);
+      const chronological = [...metrics].sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
+      const timeDiffs = chronological.slice(1).map((metric, index) =>
+        (Date.parse(metric.timestamp) - Date.parse(chronological[index].timestamp)) / 60000
+      );
+      if (timeDiffs.some((minutes) => !Number.isFinite(minutes) || minutes <= 0)) {
+        throw new Error('Timestamps must be valid, unique, and strictly increasing after sorting.');
+      }
+      // Accept any positive sampling interval and irregular time gaps. Downstream
+      // cost calculations use actual timestamps; the UI reports the median cadence.
+      const sortedDiffs = [...timeDiffs].sort((a, b) => a - b);
+      const medianInterval = sortedDiffs.length
+        ? sortedDiffs[Math.floor(sortedDiffs.length / 2)]
+        : 1;
+      loadUploadedData(chronological, fileName || 'Uploaded Dataset', columnMapping);
+      setExportNotice(`Detected median sampling interval: ${medianInterval.toFixed(2)} minutes`);
       setUploadSuccess(true);
       setErrorMessage(null);
+      if (missingFields.length > 0) {
+        setMissingFieldsNotice(missingFields);
+      }
     } catch (err: any) {
       setErrorMessage(`Failed to normalize records: ${err.message}`);
     }
@@ -149,7 +165,7 @@ export const DatasetManagerView: React.FC = () => {
             <h1 className="text-xl font-bold text-white">Dataset Management & Ingestion Hub</h1>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            Manage real production time-series traces, upload custom telemetry, or inspect Google/Alibaba trace mapping.
+            Load synthetic demo data or upload your own workload. CloudPilot ingests uploaded historical telemetry; it does not connect to live production telemetry.
           </p>
         </div>
 
@@ -192,7 +208,7 @@ export const DatasetManagerView: React.FC = () => {
               </div>
               <p className="text-xs text-slate-400">
                 Total Records: <strong className="text-white font-mono">{(dataset?.length || 0).toLocaleString()} points</strong> |
-                Interval: ~1 min | Created: {datasetMeta?.created_at ? new Date(datasetMeta.created_at).toLocaleDateString() : 'Active'}
+                Median interval: {dataset.length > 1 ? (() => { const diffs = dataset.slice(1).map((m, i) => (Date.parse(m.timestamp) - Date.parse(dataset[i].timestamp)) / 60000).filter((n) => Number.isFinite(n) && n > 0).sort((a, b) => a - b); return diffs.length ? `${diffs[Math.floor(diffs.length / 2)].toFixed(2)} min/row` : 'unknown'; })() : 'not available'} | Created: {datasetMeta?.created_at ? new Date(datasetMeta.created_at).toLocaleDateString() : 'Active'}
               </p>
               {exportNotice && (
                 <div className="flex items-center space-x-1.5 text-xs text-emerald-400 font-mono mt-1">
@@ -215,22 +231,27 @@ export const DatasetManagerView: React.FC = () => {
                 <Download className="w-3.5 h-3.5 text-cyan-400" />
                 <span>Export Dataset (CSV)</span>
               </button>
+              <a
+                href="/datasets/cloudpilot_demo_workload.csv"
+                download="cloudpilot_demo_workload.csv"
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-950/60 text-cyan-200 hover:bg-cyan-900/60 border border-cyan-800"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download 1,440-row demo CSV</span>
+              </a>
               <button
                 onClick={loadSampleDataset}
                 className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-200 hover:bg-slate-700 border border-slate-700"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span>Reload 10K Sample</span>
+                <span>Reload 600-point Sample</span>
               </button>
               <button
-                onClick={() => {
-                  trainMLModel();
-                  setActiveTab('ml');
-                }}
+                onClick={() => setActiveTab('ml')}
                 className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 text-white hover:bg-purple-500 shadow"
               >
                 <Layers className="w-3.5 h-3.5" />
-                <span>Train ML Model</span>
+                <span>Open ML Pipeline</span>
               </button>
               <button
                 onClick={() => {
@@ -254,7 +275,7 @@ export const DatasetManagerView: React.FC = () => {
                   <span>Upload Custom CSV or JSON File</span>
                 </h2>
                 <p className="text-xs text-slate-400">
-                  Select a workload metrics file from your local machine to calibrate the scaling model.
+                  Upload telemetry from different platforms; map a primary load signal and verify units before interpreting scaling or cost estimates.
                 </p>
               </div>
             </div>
@@ -310,9 +331,13 @@ export const DatasetManagerView: React.FC = () => {
 
                 {missingFieldsNotice.length > 0 && (
                   <div className="p-3 rounded-lg bg-amber-950/40 border border-amber-700/60 text-amber-300 text-xs">
-                    <strong>Notice:</strong> The following optional fields were not found in your file: [{missingFieldsNotice.join(', ')}]. CloudPilot will automatically compute realistic synthetic approximations for any unmapped telemetry.
+                    <strong>Data provenance:</strong> These source fields are unmapped or unavailable: [{missingFieldsNotice.join(', ')}]. The simulator fills its fixed internal schema with estimates for compatibility; these are not observations from your file. For a generic load signal, calibrate instance capacity to the signal's units before interpreting autoscaling or cost results.
                   </div>
                 )}
+
+                <div className="rounded-lg border border-cyan-800/60 bg-cyan-950/20 p-3 text-xs text-cyan-200">
+                  Unmapped numeric columns are preserved as source metrics. After loading, open the ML Pipeline and choose any available numeric source column as the forecast target. CloudPilot will not convert its units to requests/second or use it for scaling unless a capacity relationship is defined.
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   {targetFields.map((field) => (
@@ -325,7 +350,7 @@ export const DatasetManagerView: React.FC = () => {
                         onChange={(e) => setColumnMapping({ ...columnMapping, [field.key]: e.target.value })}
                         className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-200 text-xs font-mono"
                       >
-                        <option value="">-- None (Auto Estimate) --</option>
+                        <option value="">-- None (not observed; simulator estimate) --</option>
                         {detectedHeaders.map((h) => (
                           <option key={h} value={h}>
                             {h}
@@ -477,7 +502,7 @@ export const DatasetManagerView: React.FC = () => {
                     <li>`task_index` / `collection_id` → Aggregate to requests_per_second</li>
                   </ul>
                   <p className="pt-2 text-[11px] text-slate-500">
-                    <em>Recommended subset:</em> Filter by top 10 long-running web serving jobs over a 24-hour period (approx 10,000 - 50,000 rows).
+                    <em>Recommended subset:</em> For larger external traces, filter a documented workload window first and preserve the original source and sampling interval.
                   </p>
                 </div>
               </div>

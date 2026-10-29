@@ -30,9 +30,9 @@ export const ArchitectureReportView: React.FC = () => {
 ---
 
 ## 1. Abstract
-Modern cloud architectures predominantly rely on reactive threshold-based autoscaling (e.g., AWS CloudWatch alarms, Kubernetes Horizontal Pod Autoscaler). Reactive autoscalers evaluate telemetry strictly post-facto: only after resource utilization breaches a predetermined threshold (e.g., CPU > 75%) is a scale-out action scheduled. However, virtual machines and containers require non-zero lead times (typically 120–180 seconds for AWS EC2 instance initialization and container pulls). During this lag window, sudden traffic surges cause extreme queueing delays, CPU throttling, and Service Level Agreement (SLA) violations. Conversely, to mitigate SLA risk, cloud operators chronically overprovision static fleets, wasting 40–60% of paid capacity during off-peak hours.
+Modern cloud architectures predominantly rely on reactive threshold-based autoscaling (e.g., AWS CloudWatch alarms, Kubernetes Horizontal Pod Autoscaler). Reactive autoscalers respond after utilization crosses a configured threshold. Fixed allocation can waste capacity during low demand, while a forecast-guided policy may allocate earlier if its forecast is useful. CloudPilot models these trade-offs locally; it does not measure real VM boot latency or production SLA outcomes.
 
-**CloudPilot AI** solves this dual dilemma through proactive, predictive resource orchestration. By coupling a Random Forest time-series forecasting model with an intelligent lead-time scheduler, CloudPilot anticipates incoming request surges 10–15 minutes in advance, provisions capacity before arrival, and prevents scaling oscillation using adaptive cooldown guards. Experimental evaluations against 10,000 production trace records demonstrate an empirical **34.8% cost reduction** compared to static fixed baselines, while eliminating 94% of SLA violations associated with reactive scaling.
+**CloudPilot AI** is an academic prototype for comparing fixed allocation, reactive threshold scaling, and a past-only trend-forecast baseline on the same workload. Its separate browser ML pipeline offers a Random-Forest-style tree ensemble and an autoregressive baseline with chronological holdout metrics. The bundled data is synthetic. No measured production cost reduction or SLA improvement is claimed; results must be recorded for each workload and policy.
 
 ---
 
@@ -52,7 +52,7 @@ Traditional autoscaling suffers from **Lag Penalty** and **Flapping**:
 
 ## 3. Machine Learning Pipeline & Mathematics
 ### 3.1 Feature Engineering
-The ML model ingests multi-variate telemetry enriched with temporal cyclicity:
+The browser model forecasts request rate from ordered workload observations enriched with temporal and lag features. It trains only on records at or before the current simulation playhead:
 - **Lag Features:** $\\lambda_{t-1}, \\lambda_{t-2}, \\lambda_{t-5}$
 - **Rolling Windows:** $\\mu_{5m} = \\frac{1}{5}\\sum_{i=0}^4 \\lambda_{t-i}$, $\\mu_{15m} = \\frac{1}{15}\\sum_{i=0}^{14} \\lambda_{t-i}$
 - **Cyclical Time Encoding:**
@@ -71,19 +71,19 @@ Where:
 
 ## 4. Architectural Implementation
 1. **Data Ingestion Subsystem:** Supports sample dataset generation, custom CSV/JSON upload with auto column detection, and manual time-series matrix entry.
-2. **Predictive Analytics Engine:** Evaluates Random Forest, Autoregressive moving average, and Gradient Boosting models with zero data-leakage chronological validation.
+2. **Predictive Analytics Engine:** Offers a Random-Forest-style tree ensemble and an autoregressive baseline. Training uses only the observed prefix and calculates holdout metrics from that chronological history.
 3. **Scaling Orchestrator:** Implements cooldown hysteresis, min/max fleet bounding, and lead-time dispatch.
-4. **Virtual Fleet Simulator:** Simulates EC2/container boot progress states (STARTING, RUNNING, STOPPING, TERMINATED) with an Application Load Balancer supporting Round Robin and Least Connections routing.
-5. **Cost Optimizer:** Quantifies real-time dollar expenditure, VM-hours consumed, and percentage savings against traditional fixed baselines.
+4. **Virtual Fleet Simulator:** Maintains in-memory VM records and simulates request distribution with Round Robin and Least Connections policies. Lifecycle changes are local demo state only.
+5. **Cost Optimizer:** Estimates cost from the configured instance-hour rate and one-minute-per-row workload assumption. SLA breaches are simplified CPU/latency proxy events, not production measurements.
 
 ---
 
 ## 5. Comprehensive Viva Q&A Guide
 ### Q1: Why use predictive autoscaling instead of AWS CloudWatch alarms?
-**Answer:** AWS CloudWatch alarms are reactive—they trigger only *after* a threshold (e.g., 80% CPU for 5 minutes) is violated. Because instances require 2–3 minutes to boot and pass health checks, applications experience severe latency degradation or dropped packets during the boot window. Predictive autoscaling forecasts the surge in advance and boots the instance *before* traffic arrives.
+**Answer:** AWS CloudWatch alarms are reactive—they trigger only *after* a threshold (e.g., 80% CPU for 5 minutes) is violated. Because instances require 2–3 minutes to boot and pass health checks, applications experience severe latency degradation or dropped packets during the boot window. A forecast can, in principle, provide earlier warning, but this project only simulates the decision; it does not connect to CloudWatch or boot actual AWS instances.
 
 ### Q2: How does CloudPilot prevent "flapping" (rapid scale-up and scale-down oscillation)?
-**Answer:** CloudPilot implements cooldown timers (configurable, default 180 seconds). Once a scaling event occurs, termination actions are locked out during the cooldown window. Additionally, we enforce asymmetric thresholds (e.g., scale up at >75%, but scale down only when <30%), creating a hysteresis safety buffer.
+**Answer:** The simulator uses configured scale-up/scale-down thresholds and cooldown to reduce rapid reversals. The exact values are shown in Scaling Policy. This is a policy simulation, not a guarantee about real cloud autoscaling.
 
 ### Q3: Why is train/test split chronological instead of random shuffle?
 **Answer:** Workload data is time-series data with strong temporal dependencies and autocorrelation. A random train/test split causes severe data leakage, as future time steps would leak into the training set, yielding unrealistically optimistic metrics. We use strict chronological splitting (first 80% train, subsequent 20% test).
@@ -93,7 +93,7 @@ Where:
 $N = \\lceil \\text{Predicted RPS} / (250 \\times 0.70) \\rceil$.
 
 ### Q5: Can this run in Docker without paid cloud accounts?
-**Answer:** Yes. CloudPilot is architected with a dual-execution paradigm: it runs completely standalone in local Docker with full simulation capabilities, and includes drop-in Terraform/Boto3 scripts for optional live AWS deployment.
+**Answer:** CloudPilot runs as a local simulation. The AWS guide contains illustrative Terraform/Boto3 snippets, but they are not wired into the app or provided as a tested deployment in an aws/ directory. Do not claim live AWS provisioning.
 `;
 
   const handleDownloadMarkdown = () => {
@@ -161,7 +161,7 @@ $N = \\lceil \\text{Predicted RPS} / (250 \\times 0.70) \\rceil$.
           <div className="text-slate-500">            │</div>
           <div className="text-slate-500">            ▼</div>
           <div className="text-indigo-400 font-bold">PREDICTIVE MACHINE LEARNING MODEL:</div>
-          <div>Random Forest Regressor / Gradient Boosting (Forecast: t+5m, t+10m, t+15m)</div>
+          <div>Random-Forest-style ensemble / Autoregressive baseline (forecast from observed history)</div>
           <div className="text-slate-500">            │</div>
           <div className="text-slate-500">            ▼</div>
           <div className="text-emerald-400 font-bold">PROACTIVE SCALING ORCHESTRATOR:</div>
@@ -193,7 +193,7 @@ $N = \\lceil \\text{Predicted RPS} / (250 \\times 0.70) \\rceil$.
               Q1: What is the core flaw of traditional reactive autoscaling in AWS / GCP?
             </h3>
             <p className="text-xs text-slate-300 leading-relaxed font-sans">
-              <strong>Answer:</strong> Reactive autoscaling relies on lagging thresholds. For example, AWS CloudWatch requires an alarm state to persist across 1–2 consecutive evaluation periods before triggering a scaling event. Once triggered, instances require 120–180 seconds to provision, pull container images, and pass load balancer health checks. During this delay, client requests experience extreme queueing latency and HTTP 504 timeouts. CloudPilot avoids this by predicting the spike and initiating provisioning before traffic arrives.
+              <strong>Answer:</strong> Reactive autoscaling relies on lagging thresholds. For example, AWS CloudWatch requires an alarm state to persist across 1–2 consecutive evaluation periods before triggering a scaling event. Once triggered, instances require 120–180 seconds to provision, pull container images, and pass load balancer health checks. During this delay, client requests experience extreme queueing latency and HTTP 504 timeouts. CloudPilot can compare a forecast-guided policy in simulation. Actual boot delays, HTTP 504 errors, and cloud-provider alarm timing are not measured by the app.
             </p>
           </div>
 
@@ -211,16 +211,16 @@ $N = \\lceil \\text{Predicted RPS} / (250 \\times 0.70) \\rceil$.
               Q3: How does the orchestrator prevent rapid oscillation (flapping)?
             </h3>
             <p className="text-xs text-slate-300 leading-relaxed font-sans">
-              <strong>Answer:</strong> We enforce an asymmetric dual-threshold with an adaptive cooldown timer (default: 180 seconds). While scale-up happens rapidly when forecasted load demands it, scale-down requires sustained idle load below 30% CPU, and cannot execute within 180 seconds of the previous scaling event.
+              <strong>Answer:</strong> The simulator uses configured thresholds and a cooldown interval. The policy can reduce repeated scaling actions, but its effectiveness must be checked against the workload and configured rules.
             </p>
           </div>
 
           <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
             <h3 className="text-xs font-bold text-cyan-300">
-              Q4: Can this be deployed to AWS in real production?
+              Q4: Does this repository currently deploy CloudPilot to AWS?
             </h3>
             <p className="text-xs text-slate-300 leading-relaxed font-sans">
-              <strong>Answer:</strong> Yes. The repository includes an AWS deployment blueprint (<code className="text-emerald-300 font-mono">aws/</code>) with Terraform configs to provision an Application Load Balancer, Auto Scaling Group (ASG), and an AWS Lambda / ECS task that queries the CloudPilot ML engine and adjusts the ASG desired capacity via Boto3.
+              <strong>Answer:</strong> No. The AWS Deployment Guide shows illustrative snippets only. The current app does not provision or change AWS resources, and no tested Terraform deployment is included. The repository does not contain a tested live deployment.
             </p>
           </div>
         </div>
