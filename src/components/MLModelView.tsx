@@ -55,6 +55,7 @@ export const MLModelView: React.FC = () => {
   const targetOptions = [...standardTargets, ...sourceTargets];
   const selectedTargetLabel = targetOptions.find((option) => option.key === selectedTargetMetric)?.label || selectedTargetMetric;
   const [trainingMessage, setTrainingMessage] = useState<{ success: boolean; message: string } | null>(null);
+  const [quantumRequestNotice, setQuantumRequestNotice] = useState<string | null>(null);
 
   const runTraining = (model: MLAlgorithm) => {
     setIsTraining(true);
@@ -82,10 +83,15 @@ export const MLModelView: React.FC = () => {
     if (activeForecastProvider === 'quantum') {
       setIsTraining(true);
       setTrainingMessage(null);
+      setQuantumRequestNotice(null);
       try {
         const observedHistory = dataset.slice(0, currentIndex + 1).slice(-120);
+        // Show immediate feedback while the CPU-based QLSTM request is running.
+        setQuantumRequestNotice(`Connecting to FastAPI with ${observedHistory.length} observed CPU records. The first quantum-simulator run may take a while; keep the backend terminal open.`);
         setTrainingMessage(await forecastWithQuantum(observedHistory, selectedHorizon));
+        setQuantumRequestNotice(null);
       } catch (error) {
+        setQuantumRequestNotice(null);
         setTrainingMessage({ success: false, message: error instanceof Error ? error.message : 'Quantum forecast request failed.' });
       } finally {
         setIsTraining(false);
@@ -186,6 +192,11 @@ export const MLModelView: React.FC = () => {
           </button>
         </div>
       </div>
+      {quantumRequestNotice && quantumModelSelected && isTraining && (
+        <div role="status" aria-live="polite" className="rounded-lg border border-purple-700/60 bg-purple-950/30 px-3 py-2 text-xs leading-relaxed text-purple-200">
+          <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-purple-400" />{quantumRequestNotice}
+        </div>
+      )}
       {trainingMessage && (
         <div
           role="status"
