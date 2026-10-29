@@ -18,7 +18,7 @@ from torch import nn
 
 MODEL_NAME = "Hybrid-Quantum QLSTM (Experimental)"
 SEQUENCE_LENGTH, N_QUBITS, HIDDEN_SIZE = 6, 3, 4
-MAX_TRAIN_WINDOWS, MAX_EVAL_WINDOWS, MAX_FIT_WINDOWS = 32, 24, 40
+MAX_TRAIN_WINDOWS, MAX_EVAL_WINDOWS, MAX_FIT_WINDOWS = 12, 12, 14
 DEFAULT_ORIGINS = [
     "http://localhost:3000", "http://127.0.0.1:3000",
     "http://localhost:5173", "http://127.0.0.1:5173",
