@@ -17,9 +17,9 @@ from starlette.concurrency import run_in_threadpool
 from torch import nn
 
 MODEL_NAME = "Hybrid-Quantum QLSTM (Experimental)"
-SEQUENCE_LENGTH, N_QUBITS, HIDDEN_SIZE = 8, 3, 6
-MAX_TRAIN_WINDOWS, MAX_EVAL_WINDOWS, MAX_FIT_WINDOWS = 16, 20, 20
-TRAIN_EPOCHS = max(4, min(10, int(os.getenv("QLSTM_TRAIN_EPOCHS", "6"))))
+SEQUENCE_LENGTH, N_QUBITS, HIDDEN_SIZE = 6, 3, 6
+MAX_TRAIN_WINDOWS, MAX_EVAL_WINDOWS, MAX_FIT_WINDOWS = 12, 16, 14
+TRAIN_EPOCHS = max(4, min(8, int(os.getenv("QLSTM_TRAIN_EPOCHS", "4"))))
 DEFAULT_ORIGINS = [
     "http://localhost:3000", "http://127.0.0.1:3000",
     "http://localhost:5173", "http://127.0.0.1:5173",
