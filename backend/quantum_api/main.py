@@ -149,7 +149,7 @@ class HybridQuantumQLSTM(nn.Module):
         return self.output(hidden)
 
 
-TrainingExample = tuple[np.ndarray, float, float]
+TrainingExample = tuple[np.ndarray, float, float, float]
 
 
 def examples_for(values: np.ndarray, start: int, end: int, center: float, scale: float) -> list[TrainingExample]:
@@ -160,6 +160,7 @@ def examples_for(values: np.ndarray, start: int, end: int, center: float, scale:
             quantum_window_features(raw_window, center, scale),
             float((values[index] - center) / scale),
             float(raw_window[-1]),
+            float(np.polyfit(np.arange(len(raw_window)), raw_window, 1)[0]),
         ))
     return examples
 
@@ -167,7 +168,7 @@ def examples_for(values: np.ndarray, start: int, end: int, center: float, scale:
 def fit_one_epoch(model: HybridQuantumQLSTM, optimizer: torch.optim.Optimizer, examples: list[TrainingExample]) -> None:
     model.train()
     loss_fn = nn.MSELoss()
-    for features, target, _ in examples:
+    for features, target, _, _ in examples:
         x = torch.tensor(features, dtype=torch.float32).unsqueeze(0)
         y = torch.tensor([[target]], dtype=torch.float32)
         optimizer.zero_grad(set_to_none=True)
@@ -225,12 +226,19 @@ def fit_and_forecast(payload: ForecastRequest) -> ForecastResponse:
     optimizer = torch.optim.Adam(model.parameters(), lr=0.008)
     fit_model(model, optimizer, train_examples)
 
-    actual = np.asarray([target * scale + center for _, target, _ in holdout_examples], dtype=np.float64)
+    actual = np.asarray([target * scale + center for _, target, _, _ in holdout_examples], dtype=np.float64)
     predicted = np.asarray([
-        predict_one(model, features) * scale + center for features, _, _ in holdout_examples
+        predict_one(model, features) * scale + center for features, _, _, _ in holdout_examples
     ], dtype=np.float64)
     predicted = np.clip(predicted, 0.0, 100.0)
-    baseline = np.asarray([last_value for _, _, last_value in holdout_examples], dtype=np.float64)
+    baseline = np.asarray([last_value for _, _, last_value, _ in holdout_examples], dtype=np.float64)
+    # Blend the model's one-step estimate with a small local trend skip path.
+    # This prevents recursive mean reversion from immediately flattening a changing workload.
+    holdout_trend = np.asarray([
+        last_value + float(np.clip(slope, -2.5, 2.5))
+        for _, _, last_value, slope in holdout_examples
+    ], dtype=np.float64)
+    predicted = np.clip(0.75 * predicted + 0.25 * holdout_trend, 0.0, 100.0)
     errors = actual - predicted
     mae = float(np.mean(np.abs(errors)))
     rmse = float(np.sqrt(np.mean(errors ** 2)))
@@ -253,7 +261,19 @@ def fit_and_forecast(payload: ForecastRequest) -> ForecastResponse:
     for offset in range(1, payload.horizon_steps + 1):
         features = quantum_window_features(rolling_window, center, scale)
         normalized = float(np.clip(predict_one(model, features), -3.0, 3.0))
-        forecast = float(np.clip(center + normalized * scale, 0.0, 100.0))
+        quantum_estimate = center + normalized * scale
+        recent_window = rolling_window[-min(8, len(rolling_window)):]
+        local_slope = float(np.clip(
+            np.polyfit(np.arange(len(recent_window)), recent_window, 1)[0],
+            -2.5, 2.5,
+        ))
+        # The trend skip path decays with the horizon; recurrent output dominates later steps.
+        trend_weight = 0.30 * math.exp(-0.12 * (offset - 1))
+        trend_estimate = float(rolling_window[-1] + local_slope)
+        forecast = float(np.clip(
+            (1.0 - trend_weight) * quantum_estimate + trend_weight * trend_estimate,
+            0.0, 100.0,
+        ))
         uncertainty = min(25.0, residual_spread * (1.0 + (offset - 1) * 0.10))
         timestamp = last_timestamp + cadence * offset
         predictions.append(ForecastPoint(
@@ -282,7 +302,7 @@ def fit_and_forecast(payload: ForecastRequest) -> ForecastResponse:
         ),
         note=(
             "QLSTM uses normalized CPU level and first-difference inputs with a trainable PennyLane "
-            "quantum gate feature map. Holdout scores are chronological; baseline_mae is a last-value "
+            "quantum gate feature map with a horizon-decayed local trend skip path. Holdout scores are chronological; baseline_mae is a last-value "
             "persistence baseline. Forecast bands use holdout residual spread and are not calibrated "
             "prediction intervals. PennyLane default.qubit is a classical state-vector simulator, not hardware."
         ),
