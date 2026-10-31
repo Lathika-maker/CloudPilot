@@ -5,8 +5,12 @@ export interface QuantumForecastMetrics {
   rmse: number;
   r2: number;
   mape: number;
+  baseline_mae: number;
   holdout_size: number;
   observations_used: number;
+  training_epochs: number;
+  training_windows: number;
+  forecast_std: number;
   generated_at: string;
 }
 
@@ -122,7 +126,9 @@ export async function requestQuantumCpuForecast(
     }
     if (!result.metrics || ![
       result.metrics.mae, result.metrics.rmse, result.metrics.r2,
-      result.metrics.mape, result.metrics.holdout_size, result.metrics.observations_used,
+      result.metrics.mape, result.metrics.baseline_mae, result.metrics.holdout_size,
+      result.metrics.observations_used, result.metrics.training_epochs,
+      result.metrics.training_windows, result.metrics.forecast_std,
     ].every(isFiniteNumber)) {
       throw new Error('Quantum API response contained invalid evaluation metrics.');
     }
