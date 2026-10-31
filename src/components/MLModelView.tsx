@@ -161,6 +161,20 @@ export const MLModelView: React.FC = () => {
                 if (e.target.value === 'quantum') {
                   setActiveForecastProvider('quantum');
                   setSelectedTargetMetric('cpu_usage');
+                  // Make the first quantum run usable immediately while preserving the
+                  // observed-history boundary: move only to the 35th row, never beyond it.
+                  if (dataset.length >= 35 && currentIndex + 1 < 35) {
+                    jumpToStep(34);
+                    setTrainingMessage({
+                      success: true,
+                      message: 'Quantum history prepared: records 1–35 are now observed. Click Run QLSTM Forecast to submit the CPU history to FastAPI.',
+                    });
+                  } else if (dataset.length < 35) {
+                    setTrainingMessage({
+                      success: false,
+                      message: 'The quantum model needs at least 35 workload rows. Load or generate a larger dataset first.',
+                    });
+                  }
                 } else {
                   setActiveForecastProvider('classical');
                   setActiveModelType(e.target.value as MLAlgorithm);
