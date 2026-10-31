@@ -122,10 +122,31 @@ export const MLModelView: React.FC = () => {
     return {
       time: timeStr,
       predicted: p.predicted,
+      observed: null as number | null,
       lower: p.lowerConfidence,
       upper: p.upperConfidence,
     };
   });
+
+  // Overlay the latest observed CPU records with the API's future forecast.
+  // This makes the transition from real observations to predictions visible.
+  const quantumObservedPoints = dataset
+    .slice(Math.max(0, currentIndex - 11), currentIndex + 1)
+    .map((point) => {
+      const date = new Date(point.timestamp);
+      return {
+        time: !Number.isNaN(date.getTime())
+          ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : 'Observed',
+        observed: point.cpu_usage,
+        predicted: null as number | null,
+        lower: null as number | null,
+        upper: null as number | null,
+      };
+    });
+  const forecastChartData = quantumModelSelected
+    ? [...quantumObservedPoints, ...predictionPoints.slice(0, selectedHorizon)]
+    : predictionPoints.slice(0, selectedHorizon);
 
   return (
     <div className="space-y-8 pb-12">
@@ -263,6 +284,11 @@ export const MLModelView: React.FC = () => {
             <span className="text-xs font-mono text-slate-500">{quantumModelSelected ? 'CPU % points' : (selectedTargetMetric === 'requests_per_second' ? 'req/s' : 'target units')}</span>
           </div>
           <span className="text-[10px] text-slate-500 mt-1 block">{quantumModelSelected ? 'Chronological holdout MAE in CPU percentage points' : 'Average absolute error in selected target units'}</span>
+          {quantumModelSelected && quantumMetrics && (
+            <span className="text-[10px] text-slate-500 mt-1 block">
+              Persistence baseline MAE: {quantumMetrics.baseline_mae.toFixed(2)} CPU points
+            </span>
+          )}
         </div>
 
         {/* RMSE */}
@@ -291,14 +317,14 @@ export const MLModelView: React.FC = () => {
 
         {/* R2 Score */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm">
-          <span className="text-[11px] font-medium text-slate-400 block">{quantumModelSelected ? 'Model Alignment (R²)' : 'Coefficient of Determination (R²)'}</span>
+          <span className="text-[11px] font-medium text-slate-400 block">{quantumModelSelected ? 'Holdout R²' : 'Coefficient of Determination (R²)'}</span>
           <div className="mt-1 flex items-baseline justify-between">
             <span className="text-2xl font-bold font-mono text-indigo-400">
               {displayR2 != null ? displayR2.toFixed(3) : '—'}
             </span>
-            <span className="text-xs font-mono text-slate-500">Max 1.0</span>
+            <span className="text-xs font-mono text-slate-500">{quantumModelSelected ? 'May be negative' : 'Max 1.0'}</span>
           </div>
-          <span className="text-[10px] text-slate-500 mt-1 block">{quantumModelSelected ? 'Chronological holdout R² from the API model' : 'Explained variance proportion'}</span>
+          <span className="text-[10px] text-slate-500 mt-1 block">{quantumModelSelected ? 'Negative means the QLSTM scored worse than predicting the holdout mean.' : 'Explained variance proportion'}</span>
         </div>
       </div>
 
@@ -309,10 +335,12 @@ export const MLModelView: React.FC = () => {
           <div className="flex items-center justify-between pb-2 border-b border-slate-800">
             <div>
               <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                Feature Scores (normalized)
+                {quantumModelSelected ? 'Quantum Circuit Diagnostics' : 'Feature Scores (normalized)'}
               </h2>
               <p className="text-[11px] text-slate-500">
-                {quantumModelSelected ? 'The quantum recurrent model does not expose the browser tree-engine feature-importance scores.' : 'Tree split gains or normalized absolute baseline coefficients; scores are derived from the fitted model.'}
+                {quantumModelSelected
+                  ? 'Quantum gate and recurrent training diagnostics. Feature-importance values are not fabricated for this model.'
+                  : 'Tree split gains or normalized absolute baseline coefficients; scores are derived from the fitted model.'}
               </p>
             </div>
             <Sparkles className="w-4 h-4 text-purple-400" />
@@ -320,8 +348,37 @@ export const MLModelView: React.FC = () => {
 
           <div className="h-64 w-full relative">
             {featureChartData.length === 0 && (
-              <div className="absolute inset-0 z-10 grid place-items-center rounded-lg border border-dashed border-slate-800 bg-slate-950/40 px-6 text-center text-xs leading-relaxed text-slate-500">
-                {quantumModelSelected ? 'Feature importance is not produced by the quantum recurrent model.' : 'Feature scores appear after a successful training run on the observed history.'}
+              <div className="absolute inset-0 z-10 flex flex-col justify-center rounded-lg border border-dashed border-slate-800 bg-slate-950/95 px-4 py-3 text-xs leading-relaxed text-slate-300">
+                {quantumModelSelected ? (
+                  <>
+                    <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-purple-300">Hybrid quantum recurrent cell</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-md bg-slate-900 p-2">
+                        <strong className="block text-purple-300">3 qubits</strong>
+                        <span className="text-slate-400">PennyLane simulator</span>
+                      </div>
+                      <div className="rounded-md bg-slate-900 p-2">
+                        <strong className="block text-purple-300">Y-angle</strong>
+                        <span className="text-slate-400">Quantum embedding</span>
+                      </div>
+                      <div className="rounded-md bg-slate-900 p-2">
+                        <strong className="block text-purple-300">Entangler</strong>
+                        <span className="text-slate-400">Trainable gate layer</span>
+                      </div>
+                      <div className="rounded-md bg-slate-900 p-2">
+                        <strong className="block text-purple-300">LSTM gates</strong>
+                        <span className="text-slate-400">Input · forget · cell · output</span>
+                      </div>
+                    </div>
+                    {quantumMetrics && (
+                      <div className="mt-3 space-y-1 text-slate-400">
+                        <p><strong className="text-slate-200">Training:</strong> {quantumMetrics.training_epochs} epochs / {quantumMetrics.training_windows} windows</p>
+                        <p><strong className="text-slate-200">Persistence baseline MAE:</strong> {quantumMetrics.baseline_mae.toFixed(2)} CPU points</p>
+                        <p><strong className="text-slate-200">Forecast variation:</strong> {quantumMetrics.forecast_std.toFixed(3)} CPU points (standard deviation)</p>
+                      </div>
+                    )}
+                  </>
+                ) : 'Feature scores appear after a successful training run on the observed history.'}
               </div>
             )}
             <ResponsiveContainer width="100%" height="100%">
@@ -358,7 +415,9 @@ export const MLModelView: React.FC = () => {
                 Workload Forecast — {selectedTargetLabel}
               </h2>
               <p className="text-[11px] text-slate-500">
-                Recursive forecast for the selected horizon. Shaded bands estimate model spread; they are not calibrated 95% confidence intervals.
+                {quantumModelSelected
+                  ? 'Observed CPU history is shown in cyan; QLSTM forecasts are shown in purple. The shaded band is based on holdout residuals, not a calibrated confidence interval.'
+                  : 'Recursive forecast for the selected horizon. Shaded bands estimate model spread; they are not calibrated 95% confidence intervals.'}
               </p>
             </div>
 
@@ -387,10 +446,15 @@ export const MLModelView: React.FC = () => {
               </div>
             )}
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={predictionPoints.slice(0, selectedHorizon)} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+              <AreaChart data={forecastChartData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                 <XAxis dataKey="time" stroke="#64748b" fontSize={11} />
-                <YAxis stroke="#64748b" fontSize={11} />
+                <YAxis
+                  stroke="#64748b"
+                  fontSize={11}
+                  domain={quantumModelSelected ? [0, 100] : ['auto', 'auto']}
+                  tickFormatter={(value: number) => `${value}%`}
+                />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: '#0f172a',
@@ -415,6 +479,17 @@ export const MLModelView: React.FC = () => {
                   fill="#c084fc"
                   fillOpacity={0.1}
                 />
+                {quantumModelSelected && (
+                  <Line
+                    type="monotone"
+                    dataKey="observed"
+                    name="Observed CPU history"
+                    stroke="#22d3ee"
+                    strokeWidth={2}
+                    dot={false}
+                    connectNulls={false}
+                  />
+                )}
                 <Line
                   type="monotone"
                   dataKey="predicted"
@@ -422,6 +497,7 @@ export const MLModelView: React.FC = () => {
                   stroke="#a855f7"
                   strokeWidth={2.5}
                   dot={{ r: 4, fill: '#c084fc' }}
+                  connectNulls={false}
                 />
               </AreaChart>
             </ResponsiveContainer>
